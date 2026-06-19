@@ -50,7 +50,7 @@ Antes de executar `config` ou `up`, substitua todos os valores `REPLACE_WITH_...
 
 Nao commitar `.env.soc-copilot-lab`; manter no Git apenas `.env.soc-copilot-lab.example`.
 
-## Regras De Seguranca
+## Regras De Segurança
 
 - Nao commitar credenciais reais, tokens, dados de cliente, dados de execucao, screenshots com segredos ou exports n8n com `pinData`.
 - Credenciais de workflows n8n devem permanecer como placeholders no JSON exportado.
