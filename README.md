@@ -29,6 +29,22 @@ Perfis principais:
 | Evento Firewall Mock | Ingestao simulada de firewall | `02-workflows-n8n/soc-octopus-evento-firewall-mock.json` |
 | Cloud IAM Permissao Mock | Enriquecimento de permissao | `02-workflows-n8n/soc-octopus-cloud-iam-permissao-mock.json` |
 
+## Arquitetura
+
+<p align="center">
+  <img src="assets/readme/architecture.svg" alt="Arquitetura conceitual do SOC-Octopus-Agent" width="100%" />
+</p>
+
+Camadas principais:
+
+- `Webhook Ingress`: entrada segura e validada.
+- `Normalization Layer`: padronizacao do payload para analise.
+- `Redis Layer`: deduplicacao, idempotencia e cache temporario.
+- `PostgreSQL Layer`: persistencia estruturada e rastreabilidade.
+- `Agent Orchestration`: roteamento para especialistas tecnicos.
+- `Consolidation`: unifica saida, riscos e recomendacao final.
+- `Human Approval`: bloqueio das acoes criticas ate revisao humana.
+
 ## Estrutura
 
 | Caminho | Finalidade |

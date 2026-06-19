@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="860" viewBox="0 0 1600 860" role="img" aria-label="Arquitetura conceitual do SOC-Octopus-Agent">
+  <defs>
+    <style>
+      .title { font: 700 30px "Segoe UI", Inter, Arial, sans-serif; fill: #e2e8f0; }
+      .subtitle { font: 400 16px "Segoe UI", Inter, Arial, sans-serif; fill: #cbd5e1; }
+      .boxTitle { font: 700 18px "Segoe UI", Inter, Arial, sans-serif; fill: #e2e8f0; }
+      .boxText { font: 400 14px "Segoe UI", Inter, Arial, sans-serif; fill: #cbd5e1; }
+      .lane { fill: #0b1324; stroke: #334155; stroke-width: 2; rx: 18; }
+      .box { fill: #12213a; stroke: #4b5563; stroke-width: 2; rx: 16; }
+      .accent { fill: #7dd3fc; }
+      .link { stroke: #7dd3fc; stroke-width: 4; fill: none; opacity: 0.82; marker-end: url(#arrow); }
+      .small { font: 600 13px "Segoe UI", Inter, Arial, sans-serif; fill: #a5f3fc; letter-spacing: 0.2px; }
+    </style>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#7dd3fc"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="860" fill="#08111f"/>
+  <rect x="36" y="30" width="1528" height="800" rx="28" fill="#0b1220" stroke="#22314a"/>
+
+  <text x="72" y="88" class="title">Arquitetura Conceitual</text>
+  <text x="72" y="118" class="subtitle">Fluxo padronizado para ingesta, orquestracao, persistencia e aprovacao humana.</text>
+
+  <rect x="70" y="156" width="1460" height="150" class="lane"/>
+  <rect x="70" y="334" width="1460" height="184" class="lane"/>
+  <rect x="70" y="546" width="1460" height="180" class="lane"/>
+
+  <text x="94" y="188" class="small">Entrada e normalizacao</text>
+  <text x="94" y="366" class="small">Orquestracao, correlacao e decisao</text>
+  <text x="94" y="578" class="small">Persistencia, consolidacao e controle humano</text>
+
+  <rect x="100" y="204" width="208" height="72" class="box"/>
+  <rect x="336" y="204" width="208" height="72" class="box"/>
+  <rect x="572" y="204" width="208" height="72" class="box"/>
+  <rect x="808" y="204" width="208" height="72" class="box"/>
+  <rect x="1044" y="204" width="208" height="72" class="box"/>
+  <rect x="1280" y="204" width="208" height="72" class="box"/>
+
+  <text x="204" y="232" text-anchor="middle" class="boxTitle">Entrada</text>
+  <text x="440" y="232" text-anchor="middle" class="boxTitle">Validacao</text>
+  <text x="676" y="232" text-anchor="middle" class="boxTitle">Normalizacao</text>
+  <text x="912" y="232" text-anchor="middle" class="boxTitle">Classificacao</text>
+  <text x="1148" y="232" text-anchor="middle" class="boxTitle">Cerebro Central</text>
+  <text x="1384" y="232" text-anchor="middle" class="boxTitle">Especialistas</text>
+
+  <text x="204" y="256" text-anchor="middle" class="boxText">alertas, tickets, eventos e perguntas</text>
+  <text x="440" y="256" text-anchor="middle" class="boxText">payload minimo e autenticacao</text>
+  <text x="676" y="256" text-anchor="middle" class="boxText">modelo unico de caso</text>
+  <text x="912" y="256" text-anchor="middle" class="boxText">causa raiz provavel</text>
+  <text x="1148" y="256" text-anchor="middle" class="boxText">roteamento e rastreabilidade</text>
+  <text x="1384" y="256" text-anchor="middle" class="boxText">identidade, endpoint, rede, cloud</text>
+
+  <path class="link" d="M308 240 L336 240"/>
+  <path class="link" d="M544 240 L572 240"/>
+  <path class="link" d="M780 240 L808 240"/>
+  <path class="link" d="M1016 240 L1044 240"/>
+  <path class="link" d="M1252 240 L1280 240"/>
+
+  <rect x="116" y="392" width="220" height="78" class="box"/>
+  <rect x="372" y="392" width="220" height="78" class="box"/>
+  <rect x="628" y="392" width="220" height="78" class="box"/>
+  <rect x="884" y="392" width="220" height="78" class="box"/>
+  <rect x="1140" y="392" width="220" height="78" class="box"/>
+
+  <text x="226" y="422" text-anchor="middle" class="boxTitle">Redis Layer</text>
+  <text x="226" y="446" text-anchor="middle" class="boxText">deduplicacao, idempotencia, cache</text>
+  <text x="482" y="422" text-anchor="middle" class="boxTitle">PostgreSQL Layer</text>
+  <text x="482" y="446" text-anchor="middle" class="boxText">persistencia, auditoria, integridade</text>
+  <text x="738" y="422" text-anchor="middle" class="boxTitle">Agent Orchestration</text>
+  <text x="738" y="446" text-anchor="middle" class="boxText">especialistas tecnicos e contexto</text>
+  <text x="994" y="422" text-anchor="middle" class="boxTitle">Consolidation</text>
+  <text x="994" y="446" text-anchor="middle" class="boxText">resumo executivo e recomendacao</text>
+  <text x="1250" y="422" text-anchor="middle" class="boxTitle">Human Approval</text>
+  <text x="1250" y="446" text-anchor="middle" class="boxText">bloqueio das acoes criticas</text>
+
+  <path class="link" d="M336 431 L372 431"/>
+  <path class="link" d="M592 431 L628 431"/>
+  <path class="link" d="M848 431 L884 431"/>
+  <path class="link" d="M1104 431 L1140 431"/>
+
+  <rect x="144" y="604" width="270" height="80" class="box"/>
+  <rect x="454" y="604" width="270" height="80" class="box"/>
+  <rect x="764" y="604" width="270" height="80" class="box"/>
+  <rect x="1074" y="604" width="270" height="80" class="box"/>
+
+  <text x="279" y="634" text-anchor="middle" class="boxTitle">Saida Consolidada</text>
+  <text x="279" y="658" text-anchor="middle" class="boxText">diagnostico, risco, evidencias e proximos passos</text>
+  <text x="589" y="634" text-anchor="middle" class="boxTitle">Observabilidade</text>
+  <text x="589" y="658" text-anchor="middle" class="boxText">auditoria, logs e rastreabilidade</text>
+  <text x="899" y="634" text-anchor="middle" class="boxTitle">Governanca</text>
+  <text x="899" y="658" text-anchor="middle" class="boxText">regras, aprovacao e controle de contexto</text>
+  <text x="1209" y="634" text-anchor="middle" class="boxTitle">Memoria Corporativa</text>
+  <text x="1209" y="658" text-anchor="middle" class="boxText">futuro aprendizado com incidentes</text>
+
+  <path class="link" d="M1094 470 L1074 470 L1074 604"/>
+  <path class="link" d="M1250 470 L1209 470 L1209 604"/>
+  <path class="link" d="M738 470 L738 604 L454 604"/>
+  <path class="link" d="M994 470 L994 604"/>
+</svg>
