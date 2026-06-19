@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="760" viewBox="0 0 1600 760" role="img" aria-label="Mapa visual dos workflows principais">
+  <defs>
+    <style>
+      .title { font: 700 28px "Segoe UI", Inter, Arial, sans-serif; fill: #e2e8f0; }
+      .subtitle { font: 400 16px "Segoe UI", Inter, Arial, sans-serif; fill: #cbd5e1; }
+      .label { font: 600 18px "Segoe UI", Inter, Arial, sans-serif; fill: #e2e8f0; }
+      .small { font: 400 14px "Segoe UI", Inter, Arial, sans-serif; fill: #cbd5e1; }
+      .node { fill: #12213a; stroke: #4b5563; stroke-width: 2; rx: 14; }
+      .lane { fill: #0b1220; stroke: #334155; stroke-width: 2; rx: 20; }
+      .line { stroke: #7dd3fc; stroke-width: 4; fill: none; opacity: 0.8; }
+      .dot { fill: #7dd3fc; }
+    </style>
+  </defs>
+  <rect width="1600" height="760" fill="#08111f"/>
+  <rect x="40" y="34" width="1520" height="692" rx="26" fill="#0b1324" stroke="#22314a"/>
+  <text x="70" y="88" class="title">Mapeamento visual dos workflows principais</text>
+  <text x="70" y="118" class="subtitle">Entrada, normalizacao, orquestracao e saida controlada para o ecossistema SOC-Octopus-Agent.</text>
+
+  <g>
+    <rect x="70" y="160" width="460" height="500" class="lane"/>
+    <rect x="570" y="160" width="460" height="500" class="lane"/>
+    <rect x="1070" y="160" width="460" height="500" class="lane"/>
+
+    <text x="96" y="202" class="label">Alert Intake</text>
+    <text x="596" y="202" class="label">Prototype Mock</text>
+    <text x="1096" y="202" class="label">Firewall Event</text>
+
+    <text x="96" y="230" class="small">Ingestao e validacao inicial</text>
+    <text x="596" y="230" class="small">Fluxo local para laboratorio</text>
+    <text x="1096" y="230" class="small">Template de producao, inativo</text>
+
+    <rect x="104" y="282" width="180" height="64" class="node"/>
+    <rect x="300" y="282" width="180" height="64" class="node"/>
+    <rect x="104" y="382" width="180" height="64" class="node"/>
+    <rect x="300" y="382" width="180" height="64" class="node"/>
+    <rect x="104" y="482" width="180" height="64" class="node"/>
+    <rect x="300" y="482" width="180" height="64" class="node"/>
+
+    <rect x="604" y="282" width="180" height="64" class="node"/>
+    <rect x="800" y="282" width="180" height="64" class="node"/>
+    <rect x="604" y="382" width="180" height="64" class="node"/>
+    <rect x="800" y="382" width="180" height="64" class="node"/>
+    <rect x="604" y="482" width="180" height="64" class="node"/>
+    <rect x="800" y="482" width="180" height="64" class="node"/>
+
+    <rect x="1104" y="282" width="180" height="64" class="node"/>
+    <rect x="1300" y="282" width="180" height="64" class="node"/>
+    <rect x="1104" y="382" width="180" height="64" class="node"/>
+    <rect x="1300" y="382" width="180" height="64" class="node"/>
+    <rect x="1104" y="482" width="180" height="64" class="node"/>
+    <rect x="1300" y="482" width="180" height="64" class="node"/>
+
+    <text x="194" y="310" text-anchor="middle" class="label">Webhook</text>
+    <text x="390" y="310" text-anchor="middle" class="label">Validacao</text>
+    <text x="194" y="410" text-anchor="middle" class="label">Enriquecimento</text>
+    <text x="390" y="410" text-anchor="middle" class="label">Regras</text>
+    <text x="194" y="510" text-anchor="middle" class="label">Resposta</text>
+    <text x="390" y="510" text-anchor="middle" class="label">Auditoria</text>
+
+    <text x="694" y="310" text-anchor="middle" class="label">Trigger</text>
+    <text x="890" y="310" text-anchor="middle" class="label">Normalizer</text>
+    <text x="694" y="410" text-anchor="middle" class="label">Payloads</text>
+    <text x="890" y="410" text-anchor="middle" class="label">Validadores</text>
+    <text x="694" y="510" text-anchor="middle" class="label">Tests</text>
+    <text x="890" y="510" text-anchor="middle" class="label">Reports</text>
+
+    <text x="1194" y="310" text-anchor="middle" class="label">Webhook</text>
+    <text x="1390" y="310" text-anchor="middle" class="label">Policy</text>
+    <text x="1194" y="410" text-anchor="middle" class="label">Auth</text>
+    <text x="1390" y="410" text-anchor="middle" class="label">Error path</text>
+    <text x="1194" y="510" text-anchor="middle" class="label">Retry</text>
+    <text x="1390" y="510" text-anchor="middle" class="label">Approval</text>
+  </g>
+
+  <g>
+    <path class="line" d="M284 314 L300 314"/>
+    <path class="line" d="M284 414 L300 414"/>
+    <path class="line" d="M284 514 L300 514"/>
+    <path class="line" d="M784 314 L800 314"/>
+    <path class="line" d="M784 414 L800 414"/>
+    <path class="line" d="M784 514 L800 514"/>
+    <path class="line" d="M1284 314 L1300 314"/>
+    <path class="line" d="M1284 414 L1300 414"/>
+    <path class="line" d="M1284 514 L1300 514"/>
+    <circle cx="292" cy="314" r="7" class="dot"/>
+    <circle cx="292" cy="414" r="7" class="dot"/>
+    <circle cx="292" cy="514" r="7" class="dot"/>
+    <circle cx="792" cy="314" r="7" class="dot"/>
+    <circle cx="792" cy="414" r="7" class="dot"/>
+    <circle cx="792" cy="514" r="7" class="dot"/>
+    <circle cx="1292" cy="314" r="7" class="dot"/>
+    <circle cx="1292" cy="414" r="7" class="dot"/>
+    <circle cx="1292" cy="514" r="7" class="dot"/>
+  </g>
+</svg>
