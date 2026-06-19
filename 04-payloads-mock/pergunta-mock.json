@@ -1,0 +1,47 @@
+{
+  "case_id": "CASE-MOCK-0004",
+  "trace_id": "TRACE-MOCK-20260616-0004",
+  "input_type": "question",
+  "source_system": "analyst-console-mock",
+  "received_at": "2026-06-16T12:30:00Z",
+  "severity": "low",
+  "title": "Pergunta sobre priorizacao de vulnerabilidade",
+  "description": "Analista ficticio solicita orientacao sobre priorizacao de uma vulnerabilidade mockada em servidor exposto.",
+  "question": {
+    "text": "Como priorizar a correcao de uma vulnerabilidade critica mockada em um servidor exposto?",
+    "expected_detail_level": "technical_summary",
+    "constraints": [
+      "nao_executar_alteracoes",
+      "usar_apenas_dados_mockados",
+      "exigir_aprovacao_para_acao"
+    ]
+  },
+  "entities": {
+    "hosts": [
+      "srv-mock-web-01"
+    ],
+    "source_ips": [
+      "203.0.113.10"
+    ],
+    "services": [
+      "web-service-mock"
+    ],
+    "vulnerabilities": [
+      "CVE-MOCK-0001"
+    ]
+  },
+  "evidence": [
+    {
+      "type": "vulnerability_scan_mock",
+      "summary": "Scanner mockado indica vulnerabilidade critica em servico exposto.",
+      "timestamp": "2026-06-16T12:25:00Z"
+    }
+  ],
+  "classification_hint": "vulnerability",
+  "governance": {
+    "contains_real_customer_data": false,
+    "contains_credentials": false,
+    "human_approval_required_for_action": true,
+    "mock_payload": true
+  }
+}

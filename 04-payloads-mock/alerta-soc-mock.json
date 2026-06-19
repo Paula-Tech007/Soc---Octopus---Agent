@@ -1,0 +1,46 @@
+{
+  "case_id": "CASE-MOCK-0001",
+  "trace_id": "TRACE-MOCK-20260616-0001",
+  "input_type": "soc_alert",
+  "source_system": "siem-mock",
+  "received_at": "2026-06-16T12:00:00Z",
+  "severity": "high",
+  "title": "Possivel autenticacao suspeita em conta privilegiada",
+  "description": "Alerta mockado indicando multiplas tentativas de autenticacao em uma conta administrativa ficticia.",
+  "entities": {
+    "users": [
+      "admin.mock@example.test"
+    ],
+    "hosts": [
+      "srv-mock-ad-01"
+    ],
+    "source_ips": [
+      "198.51.100.23"
+    ],
+    "destination_ips": [
+      "192.0.2.10"
+    ],
+    "domains": [
+      "example.test"
+    ]
+  },
+  "evidence": [
+    {
+      "type": "authentication_log",
+      "summary": "Cinco falhas de autenticacao seguidas por uma autenticacao bem-sucedida.",
+      "timestamp": "2026-06-16T11:52:00Z"
+    },
+    {
+      "type": "rule_match",
+      "summary": "Regra mockada: privileged_account_suspicious_login.",
+      "timestamp": "2026-06-16T11:53:00Z"
+    }
+  ],
+  "classification_hint": "identity",
+  "governance": {
+    "contains_real_customer_data": false,
+    "contains_credentials": false,
+    "human_approval_required_for_action": true,
+    "mock_payload": true
+  }
+}

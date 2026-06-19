@@ -1,0 +1,95 @@
+erDiagram
+    CASE_RECORDS ||--o{ INPUT_PAYLOADS : receives
+    CASE_RECORDS ||--o{ AGENT_RUNS : orchestrates
+    CASE_RECORDS ||--o{ SPECIALIST_FINDINGS : produces
+    CASE_RECORDS ||--o{ REMEDIATION_PLANS : plans
+    CASE_RECORDS ||--o{ CONSOLIDATED_OUTPUTS : consolidates
+    CASE_RECORDS ||--o{ HUMAN_APPROVALS : requires
+    CASE_RECORDS ||--o{ AUDIT_EVENTS : audits
+    CASE_RECORDS ||--o{ MEMORY_CANDIDATES : proposes
+    AGENT_RUNS ||--o{ SPECIALIST_FINDINGS : generates
+
+    CASE_RECORDS {
+        bigint id
+        varchar case_id
+        varchar trace_id
+        varchar input_type
+        varchar severity
+        varchar status
+        varchar probable_root_cause
+        boolean human_approval_required
+    }
+
+    INPUT_PAYLOADS {
+        bigint id
+        varchar case_id
+        varchar trace_id
+        varchar payload_stage
+        json payload_json
+        boolean mock_payload
+    }
+
+    AGENT_RUNS {
+        bigint id
+        varchar case_id
+        varchar trace_id
+        varchar agent_name
+        varchar agent_role
+        varchar run_status
+    }
+
+    SPECIALIST_FINDINGS {
+        bigint id
+        varchar case_id
+        varchar trace_id
+        bigint agent_run_id
+        varchar specialist_name
+        text diagnosis
+        varchar risk_level
+    }
+
+    REMEDIATION_PLANS {
+        bigint id
+        varchar case_id
+        varchar trace_id
+        text remediation_summary
+        json technical_steps_json
+        boolean human_approval_required
+    }
+
+    CONSOLIDATED_OUTPUTS {
+        bigint id
+        varchar case_id
+        varchar trace_id
+        text executive_summary
+        text consolidated_diagnosis
+        varchar confidence_level
+    }
+
+    HUMAN_APPROVALS {
+        bigint id
+        varchar case_id
+        varchar trace_id
+        varchar approval_scope
+        varchar approval_status
+        datetime decided_at
+    }
+
+    AUDIT_EVENTS {
+        bigint id
+        varchar audit_id
+        varchar case_id
+        varchar trace_id
+        varchar event_type
+        varchar actor_type
+    }
+
+    MEMORY_CANDIDATES {
+        bigint id
+        varchar case_id
+        varchar trace_id
+        varchar candidate_type
+        text lesson_summary
+        varchar review_status
+    }
+

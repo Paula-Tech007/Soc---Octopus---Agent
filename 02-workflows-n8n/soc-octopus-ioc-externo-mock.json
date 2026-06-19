@@ -1,0 +1,1097 @@
+{
+  "name": "SOC-Octopus-Agent - IOC Externo Production",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "soc-octopus/ioc-externo",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false,
+          "noResponseBody": false
+        },
+        "authentication": "headerAuth"
+      },
+      "id": "prod-webhook-ioc-externo",
+      "name": "01 - Webhook Ingress Production",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -220
+      ],
+      "notesInFlow": true,
+      "notes": "Entrada de producao via webhook. Placeholders de autenticacao esperados: X-API-Key, Authorization Bearer e HMAC Signature.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_WEBHOOK_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Webhook Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "prod-manual-trigger-ioc-externo",
+      "name": "00 - Manual Trigger Replay",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Inicio manual de replay. Workflow permanece inativo e sem gatilho externo."
+    },
+    {
+      "parameters": {
+        "jsCode": "const incoming = items[0]?.json ?? {}; const hasIncomingPayload = Object.keys(incoming).length > 0 && Object.keys(incoming).some((key) => key !== 'executionMode'); const payload = incoming.payload ?? incoming.body ?? incoming ?? {}; const executionId = 'exec-' + Date.now(); const traceId = payload.trace_id || 'trace-missing'; const caseId = payload.case_id || 'case-missing'; return [{ json: { payload, workflow_context: { workflow_mode: 'production_ready', environment: 'production', source: hasIncomingPayload ? 'incoming_payload' : 'manual_trigger_empty_payload', generated_at: new Date().toISOString(), workflow_name: 'SOC-Octopus-Agent - IOC Externo Production', workflow_version: '1.0.0', observability: { started_at_ms: Date.now(), execution_id: executionId, correlation_id: [caseId, traceId].join(':'), trace_id: traceId }, auth_placeholders: { x_api_key: incoming.headers?.['x-api-key'] ?? '{{X-API-Key}}', authorization_bearer: incoming.headers?.authorization ?? '{{Authorization Bearer}}', hmac_signature: incoming.headers?.['x-hmac-signature'] ?? '{{HMAC Signature}}' } }, security_controls: { external_calls_allowed: false, remediation_allowed: false, credentials_allowed: false, production_allowed: false, production_changes_allowed: false, human_approval_required: true } } }];"
+      },
+      "id": "prod-receber-ioc-externo",
+      "name": "02 - Receber IOC Externo Production",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Recebe payload do webhook ou replay manual e prepara contexto de execucao."
+    },
+    {
+      "parameters": {
+        "jsCode": "function text(value) { return value === undefined || value === null ? '' : String(value).trim(); } function lower(value) { return text(value).toLowerCase(); } function bool(value) { return value === true || value === 'true'; } function parseSummary(summary) { const entities = {}; for (const part of text(summary).split(';')) { const pieces = part.split('='); const key = text(pieces.shift()); const value = text(pieces.join('=')); if (key && value) entities[key] = value; } return entities; } function splitList(value) { if (Array.isArray(value)) return value.map(text).filter(Boolean); return text(value).split(/[;,]/).map(text).filter(Boolean); } function parseIndicators(payload, entities) { const domains = splitList(payload.domains || payload.domain || entities.domain); const ips = splitList(payload.ips || payload.ip || payload.source_ip || entities.source_ip).concat(splitList(payload.destination_ip || entities.destination_ip)); const hashes = splitList(payload.hashes || payload.file_hash || entities.hash); return { domains: [...new Set(domains)], ips: [...new Set(ips)], hashes: [...new Set(hashes)] }; } return items.map((item) => { const payload = item.json.payload ?? {}; const entities = payload.entities && typeof payload.entities === 'object' && !Array.isArray(payload.entities) ? payload.entities : parseSummary(payload.entities_summary); const indicators = parseIndicators(payload, entities); const evidence = splitList(payload.evidence || payload.evidence_summary); const normalized = { case_id: text(payload.case_id), trace_id: text(payload.trace_id), input_type: lower(payload.input_type), source_system: text(payload.source_system), received_at: text(payload.received_at), severity: lower(payload.severity), title: text(payload.title), description: text(payload.description), classification_hint: lower(payload.classification_hint), entities, indicators, evidence, flags: { synthetic_payload: bool(payload.synthetic_payload), contains_real_customer_data: bool(payload.contains_real_customer_data), contains_credentials: bool(payload.contains_credentials), human_approval_required_for_action: bool(payload.human_approval_required_for_action) } }; return { json: { ...item.json, normalized, processing_stage: 'normalization', normalization_status: 'completed' } }; });"
+      },
+      "id": "prod-normalizar-ioc-externo",
+      "name": "03 - Normalizar Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Normaliza campos, entidades, indicadores e evidencias sem consulta externa."
+    },
+    {
+      "parameters": {
+        "jsCode": "const allowedInputTypes = new Set(['soc_alert', 'event', 'ticket']); const allowedSeverities = new Set(['low', 'medium', 'high', 'critical']); const requiredFields = ['case_id', 'trace_id', 'input_type', 'severity', 'title', 'description']; return items.map((item) => { const normalized = item.json.normalized ?? {}; const flags = normalized.flags ?? {}; const indicators = normalized.indicators ?? {}; const missing_fields = requiredFields.filter((field) => !normalized[field]); const invalid_fields = []; if (normalized.input_type && !allowedInputTypes.has(normalized.input_type)) invalid_fields.push('input_type'); if (normalized.severity && !allowedSeverities.has(normalized.severity)) invalid_fields.push('severity'); const indicatorCount = (indicators.domains ?? []).length + (indicators.ips ?? []).length + (indicators.hashes ?? []).length; if (indicatorCount === 0) invalid_fields.push('indicators'); const controls = item.json.security_controls ?? {}; const security_violations = []; if (flags.contains_real_customer_data) security_violations.push('contains_real_customer_data'); if (flags.contains_credentials) security_violations.push('contains_credentials'); if (controls.external_calls_allowed) security_violations.push('external_calls_allowed'); if (controls.credentials_allowed) security_violations.push('credentials_allowed'); if (controls.production_allowed) security_violations.push('production_allowed'); if (controls.remediation_allowed) security_violations.push('remediation_allowed'); if (controls.database_allowed) security_violations.push('database_allowed'); if (controls.redis_allowed) security_violations.push('redis_allowed'); const is_valid = missing_fields.length === 0 && invalid_fields.length === 0 && security_violations.length === 0; return { json: { ...item.json, processing_stage: 'validation', validation: { is_valid, status: is_valid ? 'valid' : 'invalid', required_fields: requiredFields, missing_fields, invalid_fields, security_violations, indicator_count: indicatorCount, validation_notes: is_valid ? 'Payload IOC externo aceito para producao controlada.' : 'Payload bloqueado antes de classificacao.' } } }; });"
+      },
+      "id": "prod-validar-ioc-externo",
+      "name": "04 - Validar Campos Obrigatorios",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Valida campos minimos, indicadores e controles de seguranca."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json[\"validation\"][\"is_valid\"]}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "prod-if-valida-ioc-externo",
+      "name": "05 - Entrada Valida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Separa entrada valida de rejeicao controlada."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const normalized = item.json.normalized ?? {}; const validation = item.json.validation ?? {}; return { json: { ...item.json, processing_stage: 'controlled_rejection', controlled_rejection: { rejected: true, reason: 'Payload IOC externo invalido ou bloqueado por controles de seguranca.', missing_fields: validation.missing_fields ?? [], invalid_fields: validation.invalid_fields ?? [], security_violations: validation.security_violations ?? [], case_id: normalized.case_id || 'not_available', trace_id: normalized.trace_id || 'not_available', next_action: 'Corrigir payload e reexecutar manualmente em ambiente controlado.', automated_action_executed: false } } }; });"
+      },
+      "id": "prod-rejeicao-controlada-ioc-externo",
+      "name": "05.1 - Rejeicao Controlada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        260
+      ],
+      "notesInFlow": true,
+      "notes": "Trata entrada invalida sem executar acao externa."
+    },
+    {
+      "parameters": {
+        "jsCode": "function includesAny(text, terms) { return terms.some((term) => text.includes(term)); } function riskFromSeverity(severity, indicatorCount) { if (severity === 'critical') return 'critical'; if (severity === 'high') return 'high'; if (severity === 'medium' && indicatorCount > 1) return 'high'; if (severity === 'medium') return 'medium'; return 'low'; } const routeTerms = [ { route: 'external_threat', terms: ['external_threat', 'ioc externo', 'malicious', 'ameaca externa', 'threat intel', 'comprometimento'] }, { route: 'reputation_gap', terms: ['sem reputacao', 'reputacao insuficiente', 'sem consulta externa', 'sem enriquecimento', 'unknown reputation'] }, { route: 'network_indicator', terms: ['conexao', 'dns', 'proxy', 'firewall', 'rede', 'egress', 'saida', 'destination_ip'] }, { route: 'false_positive', terms: ['falso positivo', 'allowlist', 'manutencao', 'teste aprovado', 'benigno'] } ]; const specialistsByRoute = { external_threat: ['threat_intelligence', 'rede', 'consolidador'], reputation_gap: ['reputacao_insuficiente', 'consolidador'], network_indicator: ['rede', 'consolidador'], false_positive: ['triagem_falso_positivo', 'consolidador'], unknown: ['triagem_soc', 'consolidador'] }; return items.map((item) => { const normalized = item.json.normalized ?? {}; const indicators = normalized.indicators ?? {}; const indicatorCount = (indicators.domains ?? []).length + (indicators.ips ?? []).length + (indicators.hashes ?? []).length; const corpus = [normalized.classification_hint, normalized.title, normalized.description, JSON.stringify(normalized.entities ?? {}), JSON.stringify(indicators), (normalized.evidence ?? []).join(' ')].join(' ').toLowerCase(); let probable_root_cause = 'unknown'; let confidence_level = 'low'; let classification_reason = 'Nenhuma regra local identificou rota especifica para o IOC.'; const directRoutes = new Set(['external_threat', 'reputation_gap', 'network_indicator', 'false_positive', 'unknown']); if (directRoutes.has(normalized.classification_hint)) { probable_root_cause = normalized.classification_hint; confidence_level = probable_root_cause === 'unknown' ? 'low' : 'high'; classification_reason = 'classification_hint indicou rota ' + probable_root_cause + '.'; } else { const matched = routeTerms.find((rule) => includesAny(corpus, rule.terms)); if (matched) { probable_root_cause = matched.route; confidence_level = 'medium'; classification_reason = 'Regras locais identificaram contexto ' + matched.route + '.'; } else if (indicatorCount > 0) { probable_root_cause = 'external_threat'; confidence_level = 'medium'; classification_reason = 'Indicadores externos presentes sem sinal forte de falso positivo.'; } } const risk_level = riskFromSeverity(normalized.severity, indicatorCount); const possible_false_positive = probable_root_cause === 'false_positive' || probable_root_cause === 'reputation_gap'; return { json: { ...item.json, processing_stage: 'classification', classification: { probable_root_cause, routing_key: probable_root_cause, risk_level, confidence_level, classification_reason, false_positive_assessment: possible_false_positive ? 'possible' : 'not_indicated_by_lab_rules', possible_false_positive, specialists_recommended: specialistsByRoute[probable_root_cause] ?? specialistsByRoute.unknown } } }; });"
+      },
+      "id": "prod-classificar-ioc-externo",
+      "name": "06 - Classificar IOC Externo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        -120
+      ],
+      "notesInFlow": true,
+      "notes": "Classifica deterministica e localmente o IOC externo."
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json[\"classification\"][\"routing_key\"]}}",
+                    "rightValue": "external_threat",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "external_threat"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json[\"classification\"][\"routing_key\"]}}",
+                    "rightValue": "reputation_gap",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reputation_gap"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json[\"classification\"][\"routing_key\"]}}",
+                    "rightValue": "network_indicator",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "network_indicator"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json[\"classification\"][\"routing_key\"]}}",
+                    "rightValue": "false_positive",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "false_positive"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "unknown",
+          "ignoreCase": true
+        }
+      },
+      "id": "prod-switch-ioc-externo",
+      "name": "07 - Switch Roteamento IOC",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1560,
+        -140
+      ],
+      "notesInFlow": true,
+      "notes": "Roteia IOC externo para especialistas locais sem chamadas externas."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const normalized = item.json.normalized ?? {}; const indicators = normalized.indicators ?? {}; return { json: { ...item.json, processing_stage: 'external_threat_specialist', specialist_analysis: { specialist: 'threat_intelligence', diagnosis: 'IOC externo com sinais suficientes para tratamento como suspeita de ameaca externa em producao controlada.', evidence_considered: normalized.evidence ?? [], affected_entities: { domains: indicators.domains ?? [], ips: indicators.ips ?? [], hashes: indicators.hashes ?? [] }, recommendation: 'Manter IOC em revisao humana e preparar enriquecimento seguro futuro antes de qualquer bloqueio.', technical_steps: ['Registrar indicadores normalizados no caso.', 'Correlacionar dominio, IP e hash com eventos internos somente leitura quando disponivel.', 'Verificar se ha contexto de allowlist ou teste aprovado.', 'Submeter qualquer bloqueio ou contencao para aprovacao humana.'], escalation: 'Escalonar para Threat Intelligence e SOC se houver recorrencia ou multiplos ativos afetados.', critical_actions_need_approval: ['bloqueio_de_dominio', 'bloqueio_de_ip', 'bloqueio_de_hash', 'alteracao_de_regra_de_rede'], remediation_allowed: false, route_confirmed: true } } }; });"
+      },
+      "id": "prod-especialista-threat-intelligence",
+      "name": "08 - Especialista Threat Intel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        -360
+      ],
+      "notesInFlow": true,
+      "notes": "Analise local de ameaca externa sem OSINT real e sem API externa."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const normalized = item.json.normalized ?? {}; return { json: { ...item.json, processing_stage: 'reputation_gap_specialist', specialist_analysis: { specialist: 'reputation_gap', diagnosis: 'Indicador externo sem reputacao confiavel disponivel no fluxo de producao controlada.', evidence_considered: normalized.evidence ?? [], affected_entities: normalized.indicators ?? {}, recommendation: 'Nao bloquear indicadores apenas por ausencia de reputacao. Registrar lacuna de enriquecimento e manter revisao humana.', technical_steps: ['Confirmar que nenhuma consulta externa foi executada.', 'Documentar quais indicadores precisam de enriquecimento futuro.', 'Priorizar correlacao com eventos internos somente leitura.', 'Manter confianca limitada ate fonte de reputacao ser configurada com seguranca.'], escalation: 'Escalonar para analista SOC se o caso exigir decisao antes do enriquecimento.', critical_actions_need_approval: ['bloqueio_de_indicador', 'atualizacao_de_lista_de_bloqueio', 'notificacao_externa'], remediation_allowed: false, route_confirmed: true } } }; });"
+      },
+      "id": "prod-especialista-reputacao",
+      "name": "08.1 - Especialista Reputacao Insuficiente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        -200
+      ],
+      "notesInFlow": true,
+      "notes": "Trata lacuna de reputacao sem consultar fontes externas."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const normalized = item.json.normalized ?? {}; const entities = normalized.entities ?? {}; const indicators = normalized.indicators ?? {}; return { json: { ...item.json, processing_stage: 'network_indicator_specialist', specialist_analysis: { specialist: 'network_indicator', diagnosis: 'IOC externo observado em contexto de conexao de rede controlada.', evidence_considered: normalized.evidence ?? [], affected_entities: { source_ip: entities.source_ip || 'origem_nao_informada', destination_ip: entities.destination_ip || 'destino_nao_informado', domains: indicators.domains ?? [], ips: indicators.ips ?? [] }, recommendation: 'Revisar contexto de rede em modo somente leitura e nao alterar regras sem aprovacao humana.', technical_steps: ['Correlacionar origem, destino e dominio em logs internos.', 'Verificar se o trafego corresponde a teste ou manutencao aprovada.', 'Avaliar impacto potencial de bloqueio sem executar mudanca.', 'Encaminhar decisao de bloqueio para aprovacao humana.'], escalation: 'Escalonar para equipe de Rede se houver indicio de comunicacao recorrente ou lateralidade.', critical_actions_need_approval: ['bloqueio_de_ip', 'bloqueio_de_dominio', 'alteracao_de_regra_firewall', 'alteracao_de_proxy'], remediation_allowed: false, route_confirmed: true } } }; });"
+      },
+      "id": "prod-especialista-rede",
+      "name": "08.2 - Especialista Rede IOC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        -40
+      ],
+      "notesInFlow": true,
+      "notes": "Analise local de rede sem firewall real, proxy real ou mudanca operacional."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const normalized = item.json.normalized ?? {}; return { json: { ...item.json, processing_stage: 'false_positive_specialist', specialist_analysis: { specialist: 'false_positive', diagnosis: 'Contexto indica possivel falso positivo ou indicador benigno em producao controlada.', evidence_considered: normalized.evidence ?? [], affected_entities: normalized.indicators ?? {}, recommendation: 'Manter o caso revisavel e exigir evidencia humana antes de encerrar como falso positivo.', technical_steps: ['Validar se existe allowlist ou janela de teste aprovada.', 'Confirmar proprietario do teste ou da manutencao.', 'Registrar motivo do possivel falso positivo.', 'Nao suprimir regra nem adicionar allowlist automaticamente.'], escalation: 'Escalonar para analista SOC responsavel pela triagem de falso positivo.', critical_actions_need_approval: ['encerramento_de_alerta', 'allowlist_de_indicador', 'supressao_de_regra'], remediation_allowed: false, route_confirmed: true } } }; });"
+      },
+      "id": "prod-especialista-falso-positivo",
+      "name": "08.3 - Especialista Falso Positivo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        120
+      ],
+      "notesInFlow": true,
+      "notes": "Analise local de possivel falso positivo sem supressao automatica."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const normalized = item.json.normalized ?? {}; return { json: { ...item.json, processing_stage: 'unknown_specialist', specialist_analysis: { specialist: 'unknown', diagnosis: 'IOC externo nao roteado por regra local especifica.', evidence_considered: normalized.evidence ?? [], affected_entities: normalized.indicators ?? {}, recommendation: 'Manter revisao humana e coletar contexto adicional antes de decisao.', technical_steps: ['Revisar payload normalizado e indicadores extraidos.', 'Solicitar contexto adicional ao solicitante ou analista.', 'Reexecutar com classification_hint especifico se apropriado.', 'Nao executar remediacao automatica.'], escalation: 'Escalonar para triagem SOC humana.', critical_actions_need_approval: ['qualquer_acao_critica'], remediation_allowed: false, route_confirmed: true } } }; });"
+      },
+      "id": "prod-especialista-unknown",
+      "name": "08.4 - Especialista Unknown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        280
+      ],
+      "notesInFlow": true,
+      "notes": "Fallback seguro para classificacao desconhecida."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const normalized = item.json.normalized ?? {}; const validation = item.json.validation ?? { is_valid: false, status: 'invalid' }; const rejection = item.json.controlled_rejection ?? null; const classification = item.json.classification ?? { probable_root_cause: rejection ? 'not_classified' : 'unknown', risk_level: 'unknown', confidence_level: 'low', classification_reason: rejection ? 'Classificacao nao executada por rejeicao controlada.' : 'Classificacao nao disponivel.' }; const specialist = item.json.specialist_analysis ?? null; const controls = item.json.security_controls ?? {}; const blocked = rejection?.rejected === true || validation.is_valid !== true; const status = blocked ? 'rejected_invalid_payload' : 'analysis_completed_prod'; const diagnosis = blocked ? rejection?.reason : (specialist?.diagnosis ?? 'Diagnostico especializado nao produzido.'); const solution_recommendation = blocked ? (rejection?.next_action ?? 'Corrigir payload antes de nova execucao.') : (specialist?.recommendation ?? 'Revisao humana obrigatoria.'); const output = { execution_id: normalized.observability?.execution_id || 'exec-' + Date.now(), workflow_name: item.json.workflow_context?.workflow_name || 'SOC-Octopus-Agent - IOC Externo Production', workflow_version: item.json.workflow_context?.workflow_version || '1.0.0', correlation_id: item.json.workflow_context?.observability?.correlation_id || [normalized.case_id || 'case-missing', normalized.trace_id || 'trace-missing'].join(':'), trace_id: normalized.trace_id || rejection?.trace_id || 'not_available', case_id: normalized.case_id || rejection?.case_id || 'not_available', status, execution_status: status, input_type: normalized.input_type || 'not_available', severity: normalized.severity || 'not_available', probable_root_cause: classification.probable_root_cause, risk_level: classification.risk_level, risk_score: classification.risk_score, confidence_level: classification.confidence_level, confidence_score: classification.confidence_score, diagnosis, solution_recommendation, technical_steps: specialist?.technical_steps ?? [], escalation: specialist?.escalation ?? 'Revisao humana obrigatoria antes de qualquer acao.', observability: { execution_id: normalized.observability?.execution_id || 'exec-' + Date.now(), workflow_version: item.json.workflow_context?.workflow_version || '1.0.0', processing_time_ms: Math.max(0, Date.now() - (item.json.workflow_context?.observability?.started_at_ms || Date.now())), correlation_id: item.json.workflow_context?.observability?.correlation_id || [normalized.case_id || 'case-missing', normalized.trace_id || 'trace-missing'].join(':'), trace_id: normalized.trace_id || 'not_available' }, audit_timestamp: new Date().toISOString(), audit_summary: 'Workflow production ready para IOC externo; auditoria preparada para persistencia, SIEM sync, ticketing, cache e aprovacao humana.', human_approval: { required: true, required_for_actions: specialist?.critical_actions_need_approval ?? [], approval_status: 'pending_human_review' }, security_notes: { external_calls_allowed: controls.external_calls_allowed === true, remediation_allowed: controls.remediation_allowed === true, credentials_allowed: controls.credentials_allowed === true, production_allowed: controls.production_allowed === true, production_changes_allowed: controls.production_changes_allowed === false, human_approval_required: true, automated_action_executed: false }, validation, rejection, classification, specialist_analysis: specialist, integration_targets: { threat_intel: process.env.THREAT_INTEL_BASE_URL ? 'configured_by_env' : 'needs_env', siem: process.env.SIEM_BASE_URL ? 'configured_by_env' : 'needs_env', ticketing: process.env.TICKETING_BASE_URL ? 'configured_by_env' : 'needs_env', postgres: 'configured_by_credential', redis: 'configured_by_credential' } }; return { json: { case_id: output.case_id, trace_id: output.trace_id, output_ready_for_human_review: true, soc_octopus_output: output } }; });"
+      },
+      "id": "prod-consolidador-ioc-externo",
+      "name": "09 - Consolidador Final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Consolida validacao, classificacao, analise especialista e controles em saida revisavel."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.THREAT_INTEL_BASE_URL}}/api/v1/enrich",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParametersJson": "={{JSON.stringify($json.soc_octopus_output)}}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "THREAT_INTEL_READONLY",
+          "id": "THREAT_INTEL_READONLY"
+        }
+      },
+      "id": "prod-threat-intel-sync",
+      "name": "10 - Threat Intel Sync Production",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2520,
+        -280
+      ],
+      "notesInFlow": true,
+      "notes": "Integracao futura read only com Threat Intelligence.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.SIEM_BASE_URL}}/api/v1/soc-octopus/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParametersJson": "={{JSON.stringify($json.soc_octopus_output)}}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "SIEM_READONLY",
+          "id": "SIEM_READONLY"
+        }
+      },
+      "id": "prod-siem-sync",
+      "name": "11 - SIEM Sync Production",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2520,
+        -120
+      ],
+      "notesInFlow": true,
+      "notes": "Integracao futura com SIEM.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.TICKETING_BASE_URL}}/api/v1/incidents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParametersJson": "={{JSON.stringify($json.soc_octopus_output)}}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "TICKETING_RW",
+          "id": "TICKETING_RW"
+        }
+      },
+      "id": "prod-ticketing-sync",
+      "name": "12 - Ticketing Sync Production",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2520,
+        40
+      ],
+      "notesInFlow": true,
+      "notes": "Integracao futura com ticketing.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO soc_audit_log (\n  event_type,\n  actor_type,\n  actor_name,\n  action,\n  details\n) VALUES (\n  $1, $2, $3, $4, $5::jsonb\n)\nRETURNING audit_uuid;",
+        "options": {
+          "queryReplacement": "={{ ['workflow_execution', 'n8n_workflow', $json.soc_octopus_output?.workflow_name || 'SOC-Octopus-Agent', $json.soc_octopus_output?.status || $json.soc_octopus_output?.execution_status || 'analysis_completed', JSON.stringify($json.soc_octopus_output || $json)] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "name": "SOC_OCTOPUS_POSTGRES",
+          "id": "SOC_OCTOPUS_POSTGRES"
+        }
+      },
+      "id": "prod-postgres-audit",
+      "name": "13 - Persistir Auditoria PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        2520,
+        220
+      ],
+      "notesInFlow": true,
+      "notes": "Persistencia de auditoria em PostgreSQL.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{$json.soc_octopus_output.correlation_id}}",
+        "value": "={{ $json.soc_octopus_output }}"
+      },
+      "credentials": {
+        "redis": {
+          "name": "SOC_OCTOPUS_REDIS",
+          "id": "SOC_OCTOPUS_REDIS"
+        }
+      },
+      "id": "prod-redis-cache",
+      "name": "14 - Cache Correlation Redis",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2520,
+        400
+      ],
+      "notesInFlow": true,
+      "notes": "Cache e correlacao em Redis.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const original = $('09 - Consolidador Final').first()?.json?.soc_octopus_output ?? item.json.soc_octopus_output ?? null; const error = item.json.error ?? item.json.message ?? null; return { json: { ...item.json, soc_octopus_output: original, integration_audit: { integration: 'threat_intel', branch: 'audit_failure', status: error ? 'failed' : 'completed', error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null, retryable: Boolean(error), observed_at: new Date().toISOString() } } }; });"
+      },
+      "id": "prod-audit-threat-intel",
+      "name": "10.1 - Auditoria Falha Threat Intel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2820,
+        -280
+      ],
+      "notesInFlow": true,
+      "notes": "Auditoria de falha Threat Intel."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const original = $('09 - Consolidador Final').first()?.json?.soc_octopus_output ?? item.json.soc_octopus_output ?? null; const error = item.json.error ?? item.json.message ?? null; return { json: { ...item.json, soc_octopus_output: original, integration_audit: { integration: 'siem', branch: 'audit_failure', status: error ? 'failed' : 'completed', error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null, retryable: Boolean(error), observed_at: new Date().toISOString() } } }; });"
+      },
+      "id": "prod-audit-siem",
+      "name": "11.1 - Auditoria Falha SIEM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2820,
+        -120
+      ],
+      "notesInFlow": true,
+      "notes": "Auditoria de falha SIEM."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const original = $('09 - Consolidador Final').first()?.json?.soc_octopus_output ?? item.json.soc_octopus_output ?? null; const error = item.json.error ?? item.json.message ?? null; return { json: { ...item.json, soc_octopus_output: original, integration_audit: { integration: 'ticketing', branch: 'audit_failure', status: error ? 'failed' : 'completed', error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null, retryable: Boolean(error), observed_at: new Date().toISOString() } } }; });"
+      },
+      "id": "prod-audit-ticketing",
+      "name": "12.1 - Auditoria Falha Ticketing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2820,
+        40
+      ],
+      "notesInFlow": true,
+      "notes": "Auditoria de falha Ticketing."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const original = $('09 - Consolidador Final').first()?.json?.soc_octopus_output ?? item.json.soc_octopus_output ?? null; const error = item.json.error ?? item.json.message ?? null; return { json: { ...item.json, soc_octopus_output: original, integration_audit: { integration: 'postgresql', branch: 'audit_failure', status: error ? 'failed' : 'completed', error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null, retryable: Boolean(error), observed_at: new Date().toISOString() } } }; });"
+      },
+      "id": "prod-audit-postgres",
+      "name": "13.1 - Auditoria Falha PostgreSQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2820,
+        220
+      ],
+      "notesInFlow": true,
+      "notes": "Auditoria de falha PostgreSQL."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => { const original = $('09 - Consolidador Final').first()?.json?.soc_octopus_output ?? item.json.soc_octopus_output ?? null; const error = item.json.error ?? item.json.message ?? null; return { json: { ...item.json, soc_octopus_output: original, integration_audit: { integration: 'redis', branch: 'audit_failure', status: error ? 'failed' : 'completed', error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null, retryable: Boolean(error), observed_at: new Date().toISOString() } } }; });"
+      },
+      "id": "prod-audit-redis",
+      "name": "14.1 - Auditoria Falha Redis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2820,
+        400
+      ],
+      "notesInFlow": true,
+      "notes": "Auditoria de falha Redis."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "position",
+        "options": {}
+      },
+      "id": "prod-merge-int-1",
+      "name": "15 - Merge Integracoes 1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3140,
+        -220
+      ],
+      "notesInFlow": true,
+      "notes": "Consolida Threat Intel e SIEM."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "position",
+        "options": {}
+      },
+      "id": "prod-merge-int-2",
+      "name": "16 - Merge Integracoes 2",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3460,
+        -40
+      ],
+      "notesInFlow": true,
+      "notes": "Consolida Ticketing com integracoes anteriores."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "position",
+        "options": {}
+      },
+      "id": "prod-merge-persist",
+      "name": "17 - Merge Persistencia",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3140,
+        320
+      ],
+      "notesInFlow": true,
+      "notes": "Consolida PostgreSQL e Redis."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "position",
+        "options": {}
+      },
+      "id": "prod-merge-final",
+      "name": "18 - Merge Final",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3780,
+        120
+      ],
+      "notesInFlow": true,
+      "notes": "Consolida integracoes e persistencia antes da resposta final."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json.soc_octopus_output}}"
+      },
+      "id": "prod-respond-ioc-externo",
+      "name": "19 - Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        4100,
+        120
+      ],
+      "notesInFlow": true,
+      "notes": "Resposta final ao Webhook."
+    }
+  ],
+  "connections": {
+    "01 - Webhook Ingress Production": {
+      "main": [
+        [
+          {
+            "node": "02 - Receber IOC Externo Production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "00 - Manual Trigger Replay": {
+      "main": [
+        [
+          {
+            "node": "02 - Receber IOC Externo Production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 - Receber IOC Externo Production": {
+      "main": [
+        [
+          {
+            "node": "03 - Normalizar Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 - Normalizar Payload": {
+      "main": [
+        [
+          {
+            "node": "04 - Validar Campos Obrigatorios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 - Validar Campos Obrigatorios": {
+      "main": [
+        [
+          {
+            "node": "05 - Entrada Valida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 - Entrada Valida?": {
+      "main": [
+        [
+          {
+            "node": "06 - Classificar IOC Externo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "05.1 - Rejeicao Controlada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05.1 - Rejeicao Controlada": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 - Classificar IOC Externo": {
+      "main": [
+        [
+          {
+            "node": "07 - Switch Roteamento IOC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 - Switch Roteamento IOC": {
+      "main": [
+        [
+          {
+            "node": "08 - Especialista Threat Intel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08.1 - Especialista Reputacao Insuficiente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08.2 - Especialista Rede IOC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08.3 - Especialista Falso Positivo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08.4 - Especialista Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 - Especialista Threat Intel": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08.1 - Especialista Reputacao Insuficiente": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08.2 - Especialista Rede IOC": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08.3 - Especialista Falso Positivo": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08.4 - Especialista Unknown": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 - Consolidador Final": {
+      "main": [
+        [
+          {
+            "node": "10 - Threat Intel Sync Production",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "11 - SIEM Sync Production",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "12 - Ticketing Sync Production",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "13 - Persistir Auditoria PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "14 - Cache Correlation Redis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 - Threat Intel Sync Production": {
+      "main": [
+        [
+          {
+            "node": "10.1 - Auditoria Falha Threat Intel",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "10.1 - Auditoria Falha Threat Intel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 - SIEM Sync Production": {
+      "main": [
+        [
+          {
+            "node": "11.1 - Auditoria Falha SIEM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "11.1 - Auditoria Falha SIEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 - Ticketing Sync Production": {
+      "main": [
+        [
+          {
+            "node": "12.1 - Auditoria Falha Ticketing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "12.1 - Auditoria Falha Ticketing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 - Persistir Auditoria PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "13.1 - Auditoria Falha PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "13.1 - Auditoria Falha PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14 - Cache Correlation Redis": {
+      "main": [
+        [
+          {
+            "node": "14.1 - Auditoria Falha Redis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "14.1 - Auditoria Falha Redis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10.1 - Auditoria Falha Threat Intel": {
+      "main": [
+        [
+          {
+            "node": "15 - Merge Integracoes 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11.1 - Auditoria Falha SIEM": {
+      "main": [
+        [
+          {
+            "node": "15 - Merge Integracoes 1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "15 - Merge Integracoes 1": {
+      "main": [
+        [
+          {
+            "node": "16 - Merge Integracoes 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12.1 - Auditoria Falha Ticketing": {
+      "main": [
+        [
+          {
+            "node": "16 - Merge Integracoes 2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "13.1 - Auditoria Falha PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "17 - Merge Persistencia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14.1 - Auditoria Falha Redis": {
+      "main": [
+        [
+          {
+            "node": "17 - Merge Persistencia",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "16 - Merge Integracoes 2": {
+      "main": [
+        [
+          {
+            "node": "18 - Merge Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "17 - Merge Persistencia": {
+      "main": [
+        [
+          {
+            "node": "18 - Merge Final",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "18 - Merge Final": {
+      "main": [
+        [
+          {
+            "node": "19 - Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null,
+  "meta": {
+    "project": "SOC-Octopus-Agent",
+    "phase": "production-ready",
+    "real_ready": true,
+    "production_ready": true,
+    "uses_synthetic_payload": false,
+    "contains_credentials": false,
+    "contains_external_integrations": true,
+    "contains_production_data": false,
+    "human_approval_required_for_critical_actions": true,
+    "validation_profile": "prod-template"
+  },
+  "tags": []
+}

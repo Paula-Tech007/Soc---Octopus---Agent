@@ -1,0 +1,265 @@
+{
+  "project": "SOC-Octopus-Agent",
+  "validator": "06-tests/10-validador-prontidao-janela-n8n.py",
+  "created_at": "2026-06-19T20:23:28.576036+00:00",
+  "status": "bloqueado",
+  "percentual_prontidao_estimado": 65,
+  "summary": {
+    "aprovados": 20,
+    "pendentes": 10,
+    "bloqueantes": 0,
+    "avisos": 1,
+    "total": 31
+  },
+  "decisao_recomendada": "Nao abrir janela de laboratorio. Resolver pendencias bloqueantes e registrar aprovacao humana antes de qualquer acao no n8n.",
+  "checks": [
+    {
+      "id": "RDY-0001",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/30-backlog-gates-decisao.md",
+      "evidencia": "01-docs/30-backlog-gates-decisao.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0002",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/61-checklist-operacional-importacao-n8n.md",
+      "evidencia": "01-docs/61-checklist-operacional-importacao-n8n.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0003",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/64-registro-decisao-versao-n8n.md",
+      "evidencia": "01-docs/64-registro-decisao-versao-n8n.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0004",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/67-criterios-ambiente-laboratorio-n8n.md",
+      "evidencia": "01-docs/67-criterios-ambiente-laboratorio-n8n.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0005",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/70-plano-evidencias-comparacao-pos-importacao-n8n.md",
+      "evidencia": "01-docs/70-plano-evidencias-comparacao-pos-importacao-n8n.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0006",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/73-modelo-ata-janela-laboratorio-n8n.md",
+      "evidencia": "01-docs/73-modelo-ata-janela-laboratorio-n8n.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0007",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/76-criterios-comparacao-automatizada-futura-n8n.md",
+      "evidencia": "01-docs/76-criterios-comparacao-automatizada-futura-n8n.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0008",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/82-guia-comparador-workflow-n8n.md",
+      "evidencia": "01-docs/82-guia-comparador-workflow-n8n.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0009",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/85-manifesto-pacote-janela-laboratorio-n8n.md",
+      "evidencia": "01-docs/85-manifesto-pacote-janela-laboratorio-n8n.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0010",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/86-roteiro-janela-laboratorio-n8n.md",
+      "evidencia": "01-docs/86-roteiro-janela-laboratorio-n8n.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0011",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 01-docs/87-matriz-evidencias-janela-laboratorio-n8n.md",
+      "evidencia": "01-docs/87-matriz-evidencias-janela-laboratorio-n8n.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0012",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 02-workflows-n8n/soc-octopus-prototipo-mock.json",
+      "evidencia": "02-workflows-n8n/soc-octopus-prototipo-mock.json",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0013",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 06-tests/05-relatorio-validacao-estatica.json",
+      "evidencia": "06-tests/05-relatorio-validacao-estatica.json",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0014",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 06-tests/06-resumo-validacao-estatica.md",
+      "evidencia": "06-tests/06-resumo-validacao-estatica.md",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0015",
+      "categoria": "artefatos",
+      "status": "aprovado",
+      "checagem": "Artefato obrigatorio encontrado: 06-tests/07-comparador-workflow-n8n.py",
+      "evidencia": "06-tests/07-comparador-workflow-n8n.py",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0016",
+      "categoria": "validacao",
+      "status": "aprovado",
+      "checagem": "Validador estatico local sem falhas.",
+      "evidencia": "548 aprovacoes, 0 warnings, 0 falhas",
+      "acao_recomendada": "Atualizar novamente antes de qualquer janela real."
+    },
+    {
+      "id": "RDY-0017",
+      "categoria": "workflow",
+      "status": "aprovado",
+      "checagem": "Workflow alvo esta inativo.",
+      "evidencia": "active=false",
+      "acao_recomendada": "Manter workflow inativo na janela futura."
+    },
+    {
+      "id": "RDY-0018",
+      "categoria": "workflow",
+      "status": "aviso",
+      "checagem": "Workflow alvo contem referencias credentials placeholder.",
+      "evidencia": "02-workflows-n8n/soc-octopus-prototipo-mock.json",
+      "acao_recomendada": "Confirmar no n8n que nenhuma credencial real foi vinculada automaticamente."
+    },
+    {
+      "id": "RDY-0019",
+      "categoria": "workflow",
+      "status": "aprovado",
+      "checagem": "Workflow alvo sem URL externa.",
+      "evidencia": "02-workflows-n8n/soc-octopus-prototipo-mock.json",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0020",
+      "categoria": "workflow",
+      "status": "aprovado",
+      "checagem": "Workflow alvo usa apenas tipos de node permitidos.",
+      "evidencia": "n8n-nodes-base.code, n8n-nodes-base.httpRequest, n8n-nodes-base.if, n8n-nodes-base.manualTrigger, n8n-nodes-base.merge, n8n-nodes-base.postgres, n8n-nodes-base.redis, n8n-nodes-base.respondToWebhook, n8n-nodes-base.switch, n8n-nodes-base.webhook",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "RDY-0021",
+      "categoria": "workflow",
+      "status": "aprovado",
+      "checagem": "Webhook com autenticacao configurada: 01 - Webhook Ingress Production.",
+      "evidencia": "authentication=headerAuth",
+      "acao_recomendada": "Confirmar credencial correta no n8n antes de qualquer ativacao."
+    },
+    {
+      "id": "RDY-0022",
+      "categoria": "decisao",
+      "status": "pendente",
+      "checagem": "Versao alvo do n8n ainda nao esta decidida.",
+      "evidencia": "01-docs/64-registro-decisao-versao-n8n.md",
+      "acao_recomendada": "Preencher e aprovar registro de decisao da versao alvo."
+    },
+    {
+      "id": "RDY-0023",
+      "categoria": "ambiente",
+      "status": "pendente",
+      "checagem": "Campo de identificacao pendente: Janela.",
+      "evidencia": "01-docs/87-matriz-evidencias-janela-laboratorio-n8n.md",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "RDY-0024",
+      "categoria": "ambiente",
+      "status": "pendente",
+      "checagem": "Campo de identificacao pendente: Ambiente.",
+      "evidencia": "01-docs/87-matriz-evidencias-janela-laboratorio-n8n.md",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "RDY-0025",
+      "categoria": "ambiente",
+      "status": "pendente",
+      "checagem": "Campo de identificacao pendente: Versao alvo do n8n.",
+      "evidencia": "01-docs/87-matriz-evidencias-janela-laboratorio-n8n.md",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "RDY-0026",
+      "categoria": "ambiente",
+      "status": "pendente",
+      "checagem": "Campo de identificacao pendente: Responsavel tecnico.",
+      "evidencia": "01-docs/87-matriz-evidencias-janela-laboratorio-n8n.md",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "RDY-0027",
+      "categoria": "ambiente",
+      "status": "pendente",
+      "checagem": "Campo de identificacao pendente: Responsavel pela aprovacao humana.",
+      "evidencia": "01-docs/87-matriz-evidencias-janela-laboratorio-n8n.md",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "RDY-0028",
+      "categoria": "manifesto",
+      "status": "pendente",
+      "checagem": "Gates do manifesto ainda nao marcados.",
+      "evidencia": "13 checkboxes vazios, 1 marcadores pendentes",
+      "acao_recomendada": "Preencher e aprovar itens obrigatorios antes da janela."
+    },
+    {
+      "id": "RDY-0029",
+      "categoria": "checklist",
+      "status": "pendente",
+      "checagem": "Checklist operacional contem itens nao marcados.",
+      "evidencia": "45 checkboxes vazios, 0 marcadores pendentes",
+      "acao_recomendada": "Preencher e aprovar itens obrigatorios antes da janela."
+    },
+    {
+      "id": "RDY-0030",
+      "categoria": "matriz",
+      "status": "pendente",
+      "checagem": "Matriz de evidencias contem evidencias pendentes.",
+      "evidencia": "0 checkboxes vazios, 49 marcadores pendentes",
+      "acao_recomendada": "Preencher e aprovar itens obrigatorios antes da janela."
+    },
+    {
+      "id": "RDY-0031",
+      "categoria": "ata",
+      "status": "pendente",
+      "checagem": "Modelo de ata contem campos pendentes.",
+      "evidencia": "17 checkboxes vazios, 64 marcadores pendentes",
+      "acao_recomendada": "Preencher e aprovar itens obrigatorios antes da janela."
+    }
+  ]
+}

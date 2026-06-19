@@ -1,0 +1,30 @@
+flowchart TD
+    A[Entrada mockada] --> B[Validacao minima]
+    B --> C{Payload processavel?}
+    C -->|Nao| D[Registrar lacunas e bloquear para revisao humana]
+    C -->|Sim| E[Normalizacao]
+    E --> F[Classificacao de causa raiz]
+    F --> G[Cerebro Central / Orquestrador]
+    G --> H{Causa raiz provavel}
+    H -->|identity| I[Especialista Identidade]
+    H -->|endpoint| J[Especialista Endpoint / EDR]
+    H -->|network| K[Especialista Rede]
+    H -->|cloud| L[Especialista Cloud]
+    H -->|vulnerability| M[Especialista Vulnerabilidades]
+    H -->|external_threat| N[Especialista Threat Intelligence / OSINT]
+    H -->|false_positive| O[Especialista Alertas SOC]
+    H -->|unknown| P[Especialistas por contexto]
+    I --> Q[Especialista Solucao e Remediacao]
+    J --> Q
+    K --> Q
+    L --> Q
+    M --> Q
+    N --> Q
+    O --> R[Consolidador]
+    P --> Q
+    Q --> S{Acao critica recomendada?}
+    S -->|Sim| T[Aprovacao humana obrigatoria]
+    S -->|Nao| R
+    T --> R
+    R --> U[Saida consolidada revisavel]
+    U --> V[Memoria corporativa futura apos aprovacao]

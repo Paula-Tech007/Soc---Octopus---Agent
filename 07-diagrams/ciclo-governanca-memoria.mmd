@@ -1,0 +1,25 @@
+flowchart TD
+    A[Incidente ou analise encerrada] --> B[Candidato a memoria]
+    B --> C{Origem rastreavel?}
+    C -->|Nao| D[Rejeitar candidato]
+    C -->|Sim| E{Contem dado sensivel?}
+    E -->|Sim| F[Saneamento ou mascaramento]
+    E -->|Nao| G[Revisao tecnica]
+    F --> G
+    G --> H{Causa, solucao ou falso positivo validados?}
+    H -->|Nao| I[Devolver para ajuste ou rejeitar]
+    H -->|Sim| J[Definir escopo e confianca]
+    J --> K[Definir prazo de revisao]
+    K --> L{Aprovacao humana}
+    L -->|Rejeitado| D
+    L -->|Aprovado| M[Memoria aprovada futura]
+    M --> N[Uso como referencia em nova analise]
+    N --> O{Memoria valida e aplicavel?}
+    O -->|Nao| P[Ignorar ou revisar]
+    O -->|Sim| Q[Usar como apoio, nao como evidencia final]
+    Q --> R[Auditar uso da memoria]
+    P --> R
+    R --> S[Revisao periodica]
+    S --> T{Expirada ou obsoleta?}
+    T -->|Sim| U[Deprecar ou atualizar]
+    T -->|Nao| M

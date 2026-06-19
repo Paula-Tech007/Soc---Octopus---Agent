@@ -1,0 +1,256 @@
+{
+  "project": "SOC-Octopus-Agent",
+  "validator": "06-tests/16-validador-formulario-p0-p1-janela-n8n.py",
+  "created_at": "2026-06-19T20:23:26.180766+00:00",
+  "status": "bloqueado",
+  "summary": {
+    "aprovados": 9,
+    "pendentes": 21,
+    "bloqueantes": 0,
+    "avisos": 0,
+    "total": 30
+  },
+  "decisao_recomendada": "Manter resolucao P0/P1 bloqueada. Preencher formulario com dados humanos confirmados antes de aplicar valores nos documentos de destino.",
+  "checks": [
+    {
+      "id": "FRM-0001",
+      "categoria": "estrutura",
+      "status": "aprovado",
+      "checagem": "Secao obrigatoria encontrada: ## Campos P0 Obrigatorios",
+      "evidencia": "## Campos P0 Obrigatorios",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "FRM-0002",
+      "categoria": "estrutura",
+      "status": "aprovado",
+      "checagem": "Secao obrigatoria encontrada: ## Campos P1 Obrigatorios Antes Da Janela",
+      "evidencia": "## Campos P1 Obrigatorios Antes Da Janela",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "FRM-0003",
+      "categoria": "estrutura",
+      "status": "aprovado",
+      "checagem": "Secao obrigatoria encontrada: ## Escopo Da Proxima Acao",
+      "evidencia": "## Escopo Da Proxima Acao",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "FRM-0004",
+      "categoria": "estrutura",
+      "status": "aprovado",
+      "checagem": "Secao obrigatoria encontrada: ## Campos Que Devem Permanecer Pendentes Ate A Janela",
+      "evidencia": "## Campos Que Devem Permanecer Pendentes Ate A Janela",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "FRM-0005",
+      "categoria": "estrutura",
+      "status": "aprovado",
+      "checagem": "Secao obrigatoria encontrada: ## Aplicacao Dos Dados",
+      "evidencia": "## Aplicacao Dos Dados",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "FRM-0006",
+      "categoria": "estrutura",
+      "status": "aprovado",
+      "checagem": "Secao obrigatoria encontrada: ## Validacao Apos Preenchimento",
+      "evidencia": "## Validacao Apos Preenchimento",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "FRM-0007",
+      "categoria": "estrutura",
+      "status": "aprovado",
+      "checagem": "Secao obrigatoria encontrada: ## Criterio De Resolucao",
+      "evidencia": "## Criterio De Resolucao",
+      "acao_recomendada": "Nenhuma acao."
+    },
+    {
+      "id": "FRM-0008",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-001 ainda requer valor confirmado, fonte/evidencia: Versao alvo do n8n.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0009",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-002 ainda requer valor confirmado, fonte/evidencia: Fonte usada para confirmar a versao.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0010",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-003 ainda requer valor confirmado, fonte/evidencia: Data da confirmacao da versao.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0011",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-004 ainda requer valor confirmado, fonte/evidencia: Responsavel pela decisao de versao.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0012",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-005 ainda requer valor confirmado, fonte/evidencia: Identificador da janela.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0013",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-006 ainda requer valor confirmado, fonte/evidencia: Ambiente de laboratorio.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0014",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-007 ainda requer fonte/evidencia: Tipo de ambiente.",
+      "evidencia": "valor=Laboratorio isolado; evidencia=Confirmar criterio atendido",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0015",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-008 ainda requer valor confirmado, fonte/evidencia: Responsavel tecnico.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0016",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-009 ainda requer valor confirmado, fonte/evidencia: Contato do responsavel tecnico.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0017",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-010 ainda requer valor confirmado, fonte/evidencia: Responsavel pela aprovacao humana.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0018",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-011 ainda requer valor confirmado, fonte/evidencia: Contato do responsavel pela aprovacao humana.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0019",
+      "categoria": "p0",
+      "status": "pendente",
+      "checagem": "P0-012 ainda requer valor confirmado, fonte/evidencia: Status da aprovacao humana da preparacao.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0020",
+      "categoria": "p1",
+      "status": "pendente",
+      "checagem": "P1-001 ainda requer valor confirmado, fonte/evidencia: Manifesto revisado por humano.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0021",
+      "categoria": "p1",
+      "status": "pendente",
+      "checagem": "P1-002 ainda requer valor confirmado, fonte/evidencia: Checklist operacional revisado.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0022",
+      "categoria": "p1",
+      "status": "pendente",
+      "checagem": "P1-003 ainda requer valor confirmado, fonte/evidencia: Matriz de evidencias preparada.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0023",
+      "categoria": "p1",
+      "status": "pendente",
+      "checagem": "P1-004 ainda requer valor confirmado, fonte/evidencia: Ata preparada.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0024",
+      "categoria": "p1",
+      "status": "pendente",
+      "checagem": "P1-005 ainda requer valor confirmado, fonte/evidencia: Plano de rollback definido.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0025",
+      "categoria": "p1",
+      "status": "pendente",
+      "checagem": "P1-006 ainda requer valor confirmado, fonte/evidencia: Plano de evidencias revisado.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0026",
+      "categoria": "p1",
+      "status": "pendente",
+      "checagem": "P1-007 ainda requer valor confirmado, fonte/evidencia: Roteiro da janela revisado.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0027",
+      "categoria": "p1",
+      "status": "pendente",
+      "checagem": "P1-008 ainda requer valor confirmado, fonte/evidencia: Escopo aprovado para a proxima acao.",
+      "evidencia": "valor=Pendente; evidencia=Pendente",
+      "acao_recomendada": "Preencher somente com informacao confirmada por responsavel humano."
+    },
+    {
+      "id": "FRM-0028",
+      "categoria": "escopo",
+      "status": "pendente",
+      "checagem": "Nenhum item de escopo da proxima acao foi aprovado.",
+      "evidencia": "6 opcoes disponiveis, 0 selecionadas",
+      "acao_recomendada": "Selecionar apenas itens aprovados explicitamente por humano."
+    },
+    {
+      "id": "FRM-0029",
+      "categoria": "restricoes",
+      "status": "aprovado",
+      "checagem": "Restricoes proibitivas permanecem registradas.",
+      "evidencia": "7 restricoes verificadas",
+      "acao_recomendada": "Manter restricoes ate aprovacao separada."
+    },
+    {
+      "id": "FRM-0030",
+      "categoria": "validacao",
+      "status": "aprovado",
+      "checagem": "Comandos de validacao apos preenchimento estao registrados.",
+      "evidencia": "3 comandos verificados",
+      "acao_recomendada": "Executar comandos apos aplicar dados humanos confirmados."
+    }
+  ]
+}

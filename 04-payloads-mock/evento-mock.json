@@ -1,0 +1,46 @@
+{
+  "case_id": "CASE-MOCK-0003",
+  "trace_id": "TRACE-MOCK-20260616-0003",
+  "input_type": "event",
+  "source_system": "infrastructure-log-mock",
+  "received_at": "2026-06-16T12:20:00Z",
+  "severity": "medium",
+  "title": "Evento de alteracao em regra de firewall",
+  "description": "Evento ficticio indicando alteracao em regra de firewall fora de janela planejada.",
+  "entities": {
+    "users": [
+      "operador.mock@example.test"
+    ],
+    "network_devices": [
+      "fw-mock-01"
+    ],
+    "source_ips": [
+      "192.0.2.55"
+    ],
+    "destination_ips": [
+      "198.51.100.80"
+    ],
+    "services": [
+      "firewall-policy"
+    ]
+  },
+  "event": {
+    "event_name": "firewall_rule_change",
+    "change_window": "fora_da_janela_mockada",
+    "change_reference": "CHANGE-MOCK-0003"
+  },
+  "evidence": [
+    {
+      "type": "configuration_log",
+      "summary": "Regra mockada teve origem e destino alterados por usuario ficticio.",
+      "timestamp": "2026-06-16T12:15:00Z"
+    }
+  ],
+  "classification_hint": "network",
+  "governance": {
+    "contains_real_customer_data": false,
+    "contains_credentials": false,
+    "human_approval_required_for_action": true,
+    "mock_payload": true
+  }
+}

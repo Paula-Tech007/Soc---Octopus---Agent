@@ -1,0 +1,1040 @@
+{
+  "name": "SOC-Octopus-Agent - Orquestrador Principal Production",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "soc-octopus/orchestrator",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false,
+          "noResponseBody": false
+        },
+        "authentication": "headerAuth"
+      },
+      "id": "prod-webhook-ingress",
+      "name": "01 - Webhook Ingress Production",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -220
+      ],
+      "notesInFlow": true,
+      "notes": "Entrada de producao via webhook. Mantem o workflow apto para ingestao real apos configuracao de URL. Placeholders de autenticacao esperados: X-API-Key, Authorization Bearer e HMAC Signature.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_WEBHOOK_HEADER_AUTH_CREDENTIAL_ID",
+          "name": "Webhook Header Auth"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "prod-manual-trigger",
+      "name": "00 - Manual Trigger Replay",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Inicio manual em producao. Workflow permanece inativo e sem gatilho externo."
+    },
+    {
+      "parameters": {
+        "jsCode": "const incoming = items[0]?.json ?? {};\nconst hasIncomingPayload = Object.keys(incoming).length > 0 && Object.keys(incoming).some((key) => key !== 'executionMode');\nconst payload = incoming.payload ?? incoming.body ?? incoming ?? {};\nconst executionId = 'exec-' + Date.now();\nconst traceId = payload.trace_id || 'trace-missing';\nconst caseId = payload.case_id || 'case-missing';\nreturn [{\n  json: {\n    payload,\n    workflow_context: {\n      workflow_mode: 'production_ready',\n      environment: 'production',\n      source: hasIncomingPayload ? 'incoming_payload' : 'manual_trigger_empty_payload',\n      generated_at: new Date().toISOString(),\n      workflow_name: 'SOC-Octopus-Agent - Orquestrador Principal Production',\n      workflow_version: '1.0.0',\n      observability: {\n        started_at_ms: Date.now(),\n        execution_id: executionId,\n        correlation_id: [caseId, traceId].join(':'),\n        trace_id: traceId\n      },\n      auth_placeholders: {\n        x_api_key: incoming.headers?.['x-api-key'] ?? '{{X-API-Key}}',\n        authorization_bearer: incoming.headers?.authorization ?? '{{Authorization Bearer}}',\n        hmac_signature: incoming.headers?.['x-hmac-signature'] ?? '{{HMAC Signature}}'\n      }\n    },\n    security_controls: {\n      external_calls_allowed: false,\n      remediation_allowed: false,\n      credentials_allowed: false,\n      production_allowed: false,\n      human_approval_required: true\n    }\n  }\n}];"
+      },
+      "id": "prod-receber-payload",
+      "name": "02 - Receber Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Recebe payload do gatilho manual ou do webhook e prepara o contexto de execucao sem gerar dado sintetico."
+    },
+    {
+      "parameters": {
+        "jsCode": "function asText(value) {\n  if (value === undefined || value === null) return '';\n  return String(value).trim();\n}\n\nfunction asBool(value) {\n  return value === true || value === 'true';\n}\n\nfunction parseEntities(payload) {\n  if (payload.entities && typeof payload.entities === 'object' && !Array.isArray(payload.entities)) {\n    return payload.entities;\n  }\n  const summary = asText(payload.entities_summary);\n  const result = {};\n  for (const part of summary.split(';')) {\n    const [key, ...rest] = part.split('=');\n    if (key && rest.length) result[key.trim()] = rest.join('=').trim();\n  }\n  return result;\n}\n\nfunction normalizeEvidence(payload) {\n  if (Array.isArray(payload.evidence)) return payload.evidence.map(asText).filter(Boolean);\n  const evidence = asText(payload.evidence_summary || payload.evidence);\n  return evidence ? [evidence] : [];\n}\n\nreturn items.map((item) => {\n  const payload = item.json.payload ?? {};\n  const observability = item.json.workflow_context?.observability ?? {};\n  const normalized = {\n    case_id: asText(payload.case_id),\n    trace_id: asText(payload.trace_id),\n    input_type: asText(payload.input_type).toLowerCase(),\n    source_system: asText(payload.source_system),\n    received_at: asText(payload.received_at),\n    severity: asText(payload.severity).toLowerCase(),\n    title: asText(payload.title),\n    description: asText(payload.description),\n    classification_hint: asText(payload.classification_hint).toLowerCase(),\n    entities: parseEntities(payload),\n    evidence: normalizeEvidence(payload),\n    flags: {\n      synthetic_payload: asBool(payload.synthetic_payload),\n      contains_real_customer_data: asBool(payload.contains_real_customer_data),\n      contains_credentials: asBool(payload.contains_credentials),\n      human_approval_required_for_action: asBool(payload.human_approval_required_for_action)\n    },\n    observability,\n    workflow_version: item.json.workflow_context?.workflow_version || '1.0.0'\n  };\n\n  return {\n    json: {\n      ...item.json,\n      normalized,\n      processing_stage: 'normalization',\n      normalization_status: 'completed'\n    }\n  };\n});"
+      },
+      "id": "prod-normalizar",
+      "name": "03 - Normalizar Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Normaliza campos de entrada, entidades, evidencias e contexto de observabilidade."
+    },
+    {
+      "parameters": {
+        "jsCode": "const allowedInputTypes = new Set(['soc_alert', 'ticket', 'event', 'question']);\nconst allowedSeverities = new Set(['low', 'medium', 'high', 'critical']);\nconst requiredFields = ['case_id', 'trace_id', 'input_type', 'severity', 'title', 'description'];\n\nreturn items.map((item) => {\n  const normalized = item.json.normalized ?? {};\n  const missing_fields = requiredFields.filter((field) => !normalized[field]);\n  const invalid_fields = [];\n\n  if (normalized.input_type && !allowedInputTypes.has(normalized.input_type)) invalid_fields.push('input_type');\n  if (normalized.severity && !allowedSeverities.has(normalized.severity)) invalid_fields.push('severity');\n\n  const security = item.json.security_controls ?? {};\n  const flags = normalized.flags ?? {};\n  const security_violations = [];\n\n  if (flags.contains_real_customer_data) security_violations.push('contains_real_customer_data');\n  if (flags.contains_credentials) security_violations.push('contains_credentials');\n  if (security.external_calls_allowed) security_violations.push('external_calls_allowed');\n  if (security.remediation_allowed) security_violations.push('remediation_allowed');\n  if (security.credentials_allowed) security_violations.push('credentials_allowed');\n  if (security.production_allowed) security_violations.push('production_allowed');\n\n  const is_valid = missing_fields.length === 0 && invalid_fields.length === 0 && security_violations.length === 0;\n\n  return {\n    json: {\n      ...item.json,\n      processing_stage: 'validation',\n      validation: {\n        is_valid,\n        status: is_valid ? 'valid' : 'invalid',\n        required_fields: requiredFields,\n        missing_fields,\n        invalid_fields,\n        security_violations,\n        validation_notes: is_valid ? 'Entrada aceita para producao.' : 'Entrada bloqueada antes de classificacao.'\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-validar",
+      "name": "04 - Validar Campos Obrigatorios",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Valida campos minimos, enums e controles de seguranca antes da classificacao."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json[\"validation\"][\"is_valid\"]}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "prod-if-valido",
+      "name": "05 - Entrada Valida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Bloqueia payload invalido e envia a saida false para rejeicao controlada."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const normalized = item.json.normalized ?? {};\n  const validation = item.json.validation ?? {};\n  return {\n    json: {\n      ...item.json,\n      processing_stage: 'controlled_rejection',\n      controlled_rejection: {\n        rejected: true,\n        reason: 'Payload invalido ou violacao de seguranca detectada antes da classificacao.',\n        missing_fields: validation.missing_fields ?? [],\n        invalid_fields: validation.invalid_fields ?? [],\n        security_violations: validation.security_violations ?? [],\n        case_id: normalized.case_id || 'not_available',\n        trace_id: normalized.trace_id || 'not_available',\n        next_action: 'Corrigir payload em ambiente controlado e reexecutar manualmente.',\n        automated_action_executed: false\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-rejeicao-controlada",
+      "name": "05.1 - Rejeicao Controlada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        220
+      ],
+      "notesInFlow": true,
+      "notes": "Trata a saida false da validacao sem encerrar silenciosamente e sem executar acao externa."
+    },
+    {
+      "parameters": {
+        "jsCode": "function includesAny(text, terms) {\n  return terms.some((term) => text.includes(term));\n}\n\nfunction riskFromSeverity(severity) {\n  if (severity === 'critical') return 'critical';\n  if (severity === 'high') return 'high';\n  if (severity === 'medium') return 'medium';\n  return 'low';\n}\n\nconst routeRules = [\n  { route: 'identity', terms: ['identity', 'auth', 'autentic', 'login', 'mfa', 'vpn', 'senha', 'privilegi', 'conta', 'usuario'] },\n  { route: 'endpoint', terms: ['endpoint', 'edr', 'process', 'processo', 'malware', 'hash', 'arquivo', 'execucao'] },\n  { route: 'network', terms: ['network', 'rede', 'firewall', 'porta', 'ip ', 'tr?fego', 'trafego', 'dns', 'proxy', 'conexao'] },\n  { route: 'infrastructure', terms: ['infrastructure', 'infra', 'servidor', 'servico', 'servi?o', 'cpu', 'memoria', 'disco', 'cluster', 'plataforma'] },\n  { route: 'automation', terms: ['automation', 'automacao', 'automa??o', 'job', 'pipeline', 'script', 'playbook', 'orquestracao', 'orquestra??o'] }\n];\n\nconst specialistsByRoute = {\n  identity: ['alertas_soc', 'identidade', 'solucao_remediacao', 'consolidador'],\n  endpoint: ['endpoint_edr', 'alertas_soc', 'solucao_remediacao', 'consolidador'],\n  network: ['rede', 'alertas_soc', 'solucao_remediacao', 'consolidador'],\n  infrastructure: ['infraestrutura_plataformas', 'alertas_soc', 'solucao_remediacao', 'consolidador'],\n  automation: ['automacao', 'alertas_soc', 'solucao_remediacao', 'consolidador'],\n  unknown: ['alertas_soc', 'consolidador']\n};\n\nreturn items.map((item) => {\n  const normalized = item.json.normalized ?? {};\n  const evidenceText = Array.isArray(normalized.evidence) ? normalized.evidence.join(' ') : '';\n  const entitiesText = JSON.stringify(normalized.entities ?? {});\n  const corpus = [normalized.classification_hint, normalized.title, normalized.description, evidenceText, entitiesText].join(' ').toLowerCase();\n\n  let probable_root_cause = 'unknown';\n  let classification_reason = 'Nenhuma regra deterministica encontrou causa raiz com confianca suficiente.';\n  let confidence_level = 'low';\n\n  const hint = normalized.classification_hint;\n  const directRoute = routeRules.find((rule) => rule.route === hint);\n  if (directRoute) {\n    probable_root_cause = directRoute.route;\n    classification_reason = 'classification_hint indicou rota ' + directRoute.route + '.';\n    confidence_level = 'high';\n  } else {\n    const matched = routeRules.find((rule) => includesAny(corpus, rule.terms));\n    if (matched) {\n      probable_root_cause = matched.route;\n      classification_reason = 'Regras locais identificaram termos associados a ' + matched.route + '.';\n      confidence_level = 'medium';\n    }\n  }\n\n  const risk_level = riskFromSeverity(normalized.severity);\n  const risk_score = {\n    critical: 95,\n    high: 80,\n    medium: 55,\n    low: 25\n  }[risk_level] || 25;\n  const confidence_score = {\n    high: 90,\n    medium: 70,\n    low: 45\n  }[confidence_level] || 45;\n\n  return {\n    json: {\n      ...item.json,\n      processing_stage: 'classification',\n      classification: {\n        probable_root_cause,\n        routing_key: probable_root_cause,\n        risk_level,\n        risk_score,\n        confidence_level,\n        confidence_score,\n        classification_reason,\n        false_positive_assessment: 'possible',\n        possible_false_positive: true,\n        specialists_recommended: specialistsByRoute[probable_root_cause] ?? specialistsByRoute.unknown\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-classificar",
+      "name": "06 - Classificar Entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        -120
+      ],
+      "notesInFlow": true,
+      "notes": "Classificacao deterministica local para identity, endpoint, network, infrastructure, automation e unknown."
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json[\"classification\"][\"routing_key\"]}}",
+                    "rightValue": "identity",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "identity"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json[\"classification\"][\"routing_key\"]}}",
+                    "rightValue": "endpoint",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "endpoint"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json[\"classification\"][\"routing_key\"]}}",
+                    "rightValue": "network",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "network"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json[\"classification\"][\"routing_key\"]}}",
+                    "rightValue": "infrastructure",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "infrastructure"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json[\"classification\"][\"routing_key\"]}}",
+                    "rightValue": "automation",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "automation"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "unknown",
+          "ignoreCase": true
+        }
+      },
+      "id": "prod-switch-rota",
+      "name": "07 - Switch Roteamento Causa Raiz",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1560,
+        -120
+      ],
+      "notesInFlow": true,
+      "notes": "Roteia a analise para especialistas dedicados por causa raiz."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const normalized = item.json.normalized ?? {};\n  const classification = item.json.classification ?? {};\n  const entities = normalized.entities ?? {};\n  const evidence = Array.isArray(normalized.evidence) ? normalized.evidence : [];\n  return {\n    json: {\n      ...item.json,\n      processing_stage: 'identity_specialist',\n      specialist_analysis: {\n        specialist: 'identity',\n        diagnosis: 'Possivel uso indevido ou anomalo de identidade privilegiada em ambiente controlado.',\n        evidence_considered: evidence,\n        affected_entities: {\n          user: entities.user || 'usuario_nao_informado',\n          source_ip: entities.source_ip || 'origem_nao_informada',\n          host: entities.host || 'host_nao_informado'\n        },\n        recommendation: 'Tratar como suspeita de identidade ate validacao humana. Nenhuma acao automatica deve ser executada.',\n        technical_steps: [\n          'Correlacionar falhas e sucesso de autenticacao para o mesmo usuario.',\n          'Confirmar legitimidade do acesso com responsavel humano.',\n          'Revisar MFA, sessoes ativas e origem do acesso em modo somente leitura.',\n          'Preparar contencao apenas se houver aprovacao humana explicita.'\n        ],\n        escalation: 'Escalonar para equipe de Identidade se o acesso nao for reconhecido.',\n        critical_actions_need_approval: ['bloqueio_de_conta', 'reset_de_senha', 'revogacao_de_sessao', 'alteracao_de_mfa'],\n        remediation_allowed: false,\n        route_confirmed: classification.routing_key === 'identity'\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-especialista-identidade",
+      "name": "08 - Especialista Identidade",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        -360
+      ],
+      "notesInFlow": true,
+      "notes": "Analise local de identidade sem IA, sem API externa e sem remediacao."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const normalized = item.json.normalized ?? {};\n  const entities = normalized.entities ?? {};\n  const evidence = Array.isArray(normalized.evidence) ? normalized.evidence : [];\n  return {\n    json: {\n      ...item.json,\n      processing_stage: 'endpoint_specialist',\n      specialist_analysis: {\n        specialist: 'endpoint',\n        diagnosis: 'Possivel atividade suspeita em endpoint ou processo, avaliada com dados locais do workflow.',\n        evidence_considered: evidence,\n        affected_entities: {\n          host: entities.host || 'host_nao_informado',\n          process: entities.process || 'processo_nao_informado',\n          user: entities.user || 'usuario_nao_informado'\n        },\n        recommendation: 'Validar processo, host e contexto antes de qualquer acao de contencao.',\n        technical_steps: [\n          'Revisar arvore de processo em fonte somente leitura quando disponivel.',\n          'Correlacionar hash, usuario e host com alertas relacionados.',\n          'Confirmar se o processo e esperado para o ativo.',\n          'Preparar isolamento ou contencao apenas apos aprovacao humana.'\n        ],\n        escalation: 'Escalonar para equipe de Endpoint/EDR se o processo nao for reconhecido.',\n        critical_actions_need_approval: ['isolamento_de_host', 'kill_process', 'quarentena_de_arquivo'],\n        remediation_allowed: false,\n        route_confirmed: true\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-especialista-endpoint",
+      "name": "08.1 - Especialista Endpoint",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        -220
+      ],
+      "notesInFlow": true,
+      "notes": "Analise local de endpoint sem EDR real, sem API externa e sem contencao."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const normalized = item.json.normalized ?? {};\n  const entities = normalized.entities ?? {};\n  const evidence = Array.isArray(normalized.evidence) ? normalized.evidence : [];\n  return {\n    json: {\n      ...item.json,\n      processing_stage: 'network_specialist',\n      specialist_analysis: {\n        specialist: 'network',\n        diagnosis: 'Possivel evento de rede ou firewall que exige revisao de contexto e mudancas recentes.',\n        evidence_considered: evidence,\n        affected_entities: {\n          source_ip: entities.source_ip || 'origem_nao_informada',\n          destination_ip: entities.destination_ip || 'destino_nao_informado',\n          firewall_rule: entities.firewall_rule || 'regra_nao_informada'\n        },\n        recommendation: 'Validar origem, destino, regra e janela de mudanca antes de qualquer alteracao.',\n        technical_steps: [\n          'Correlacionar trafego com logs de firewall ou proxy em modo somente leitura.',\n          'Verificar se houve mudanca aprovada relacionada.',\n          'Avaliar impacto de bloqueio ou liberacao sem executar alteracao.',\n          'Submeter qualquer mudanca de regra para aprovacao humana.'\n        ],\n        escalation: 'Escalonar para equipe de Rede se houver divergencia de regra ou trafego nao reconhecido.',\n        critical_actions_need_approval: ['bloqueio_de_ip', 'alteracao_de_regra_firewall', 'alteracao_de_rota'],\n        remediation_allowed: false,\n        route_confirmed: true\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-especialista-network",
+      "name": "08.2 - Especialista Network",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        -80
+      ],
+      "notesInFlow": true,
+      "notes": "Analise local de rede sem firewall real, sem API externa e sem mudanca de regra."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const normalized = item.json.normalized ?? {};\n  const entities = normalized.entities ?? {};\n  const evidence = Array.isArray(normalized.evidence) ? normalized.evidence : [];\n  return {\n    json: {\n      ...item.json,\n      processing_stage: 'infrastructure_specialist',\n      specialist_analysis: {\n        specialist: 'infrastructure',\n        diagnosis: 'Possivel evento de infraestrutura ou plataforma que requer validacao operacional.',\n        evidence_considered: evidence,\n        affected_entities: {\n          host: entities.host || 'host_nao_informado',\n          service: entities.service || 'servico_nao_informado',\n          cluster: entities.cluster || 'cluster_nao_informado'\n        },\n        recommendation: 'Validar saude do servico, mudancas recentes e impacto antes de acionar recuperacao.',\n        technical_steps: [\n          'Revisar sinais de disponibilidade e capacidade em modo somente leitura.',\n          'Correlacionar com mudancas ou manutencoes recentes.',\n          'Avaliar impacto e prioridade operacional.',\n          'Preparar rollback ou recuperacao apenas com aprovacao humana.'\n        ],\n        escalation: 'Escalonar para equipe de Infraestrutura/Plataformas se houver impacto operacional.',\n        critical_actions_need_approval: ['restart_de_servico', 'rollback_de_mudanca', 'failover', 'alteracao_de_capacidade'],\n        remediation_allowed: false,\n        route_confirmed: true\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-especialista-infrastructure",
+      "name": "08.3 - Especialista Infrastructure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        60
+      ],
+      "notesInFlow": true,
+      "notes": "Analise local de infraestrutura sem banco, cloud, API externa ou acao operacional."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const normalized = item.json.normalized ?? {};\n  const entities = normalized.entities ?? {};\n  const evidence = Array.isArray(normalized.evidence) ? normalized.evidence : [];\n  return {\n    json: {\n      ...item.json,\n      processing_stage: 'automation_specialist',\n      specialist_analysis: {\n        specialist: 'automation',\n        diagnosis: 'Possivel falha, execucao inesperada ou comportamento anomalo de automacao.',\n        evidence_considered: evidence,\n        affected_entities: {\n          automation_job: entities.automation_job || 'job_nao_informado',\n          pipeline: entities.pipeline || 'pipeline_nao_informada',\n          host: entities.host || 'host_nao_informado'\n        },\n        recommendation: 'Validar gatilho, parametros e escopo da automacao antes de qualquer reexecucao.',\n        technical_steps: [\n          'Revisar logs sinteticos ou registros somente leitura da automacao.',\n          'Verificar se a execucao foi planejada e aprovada.',\n          'Confirmar parametros usados e impacto potencial.',\n          'Bloquear reexecucao automatica ate aprovacao humana.'\n        ],\n        escalation: 'Escalonar para equipe de Automacao/Plataforma se houver execucao inesperada.',\n        critical_actions_need_approval: ['rerun_de_job', 'cancelamento_de_job', 'alteracao_de_playbook', 'alteracao_de_pipeline'],\n        remediation_allowed: false,\n        route_confirmed: true\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-especialista-automation",
+      "name": "08.4 - Especialista Automation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        200
+      ],
+      "notesInFlow": true,
+      "notes": "Analise local de automacao sem executar jobs, scripts ou playbooks."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const normalized = item.json.normalized ?? {};\n  const evidence = Array.isArray(normalized.evidence) ? normalized.evidence : [];\n  return {\n    json: {\n      ...item.json,\n      processing_stage: 'unknown_specialist',\n      specialist_analysis: {\n        specialist: 'unknown',\n        diagnosis: 'Causa raiz nao determinada pelas regras locais do workflow.',\n        evidence_considered: evidence,\n        affected_entities: normalized.entities ?? {},\n        recommendation: 'Manter caso em revisao humana e coletar mais contexto antes de qualquer acao.',\n        technical_steps: [\n          'Revisar campos de entrada e evidencias disponiveis.',\n          'Solicitar contexto adicional ao responsavel humano.',\n          'Reexecutar com classification_hint ou evidencias mais especificas se apropriado.',\n          'Nao executar remediacao automatica.'\n        ],\n        escalation: 'Escalonar para triagem SOC humana.',\n        critical_actions_need_approval: ['qualquer_acao_critica'],\n        remediation_allowed: false,\n        route_confirmed: true\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-especialista-unknown",
+      "name": "08.5 - Especialista Unknown",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        340
+      ],
+      "notesInFlow": true,
+      "notes": "Rota segura para classificacao desconhecida, sem acao automatica."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const normalized = item.json.normalized ?? {};\n  const validation = item.json.validation ?? { is_valid: false, status: 'invalid' };\n  const rejection = item.json.controlled_rejection ?? null;\n  const classification = item.json.classification ?? {\n    probable_root_cause: rejection ? 'not_classified' : 'unknown',\n    risk_level: 'unknown',\n    risk_score: 0,\n    confidence_level: 'low',\n    confidence_score: 0,\n    classification_reason: rejection ? 'Classificacao nao executada por rejeicao controlada.' : 'Classificacao nao disponivel.'\n  };\n  const specialist = item.json.specialist_analysis ?? null;\n  const controls = item.json.security_controls ?? {};\n  const blocked = rejection?.rejected === true || validation.is_valid !== true;\n  const status = blocked ? 'rejected_invalid_payload' : 'analysis_completed_prod';\n  const finalRecommendation = blocked\n    ? (rejection?.next_action ?? 'Corrigir campos obrigatorios ou violacoes de seguranca antes de nova execucao.')\n    : (specialist?.recommendation ?? 'Revisar manualmente; analise especializada nao disponivel.');\n  const observability = normalized.observability ?? {};\n  const now = new Date();\n  const started = observability.started_at_ms || Date.now();\n  const processing_time_ms = Math.max(0, Date.now() - started);\n  const workflowName = item.json.workflow_context?.workflow_name || 'SOC-Octopus-Agent - Orquestrador Principal Production';\n  const workflowVersion = item.json.workflow_context?.workflow_version || '1.0.0';\n  const executionId = observability.execution_id || 'exec-' + Date.now();\n  const correlationId = observability.correlation_id || [normalized.case_id || 'case-missing', normalized.trace_id || 'trace-missing'].join(':');\n  const correlation = {\n    user: normalized.entities?.user || null,\n    host: normalized.entities?.host || null,\n    process: normalized.entities?.process || null,\n    ioc: normalized.entities?.ioc || normalized.entities?.file_hash || normalized.entities?.rule_id || null,\n    ticket: normalized.entities?.ticket || normalized.case_id || null,\n    previous_event: normalized.evidence?.[0] || null\n  };\n\n  const output = {\n    execution_id: executionId,\n    workflow_name: workflowName,\n    workflow_version: workflowVersion,\n    correlation_id: correlationId,\n    trace_id: normalized.trace_id || rejection?.trace_id || 'not_available',\n    case_id: normalized.case_id || rejection?.case_id || 'not_available',\n    status,\n    execution_status: status,\n    input_type: normalized.input_type || 'not_available',\n    severity: normalized.severity || 'not_available',\n    probable_root_cause: classification.probable_root_cause,\n    risk_level: classification.risk_level,\n    risk_score: classification.risk_score,\n    confidence_level: classification.confidence_level,\n    confidence_score: classification.confidence_score,\n    diagnosis: blocked ? rejection?.reason : (specialist?.diagnosis ?? 'Diagnostico especializado nao produzido.'),\n    solution_recommendation: finalRecommendation,\n    technical_steps: specialist?.technical_steps ?? [],\n    escalation: specialist?.escalation ?? 'Revisao humana obrigatoria antes de qualquer acao.',\n    observability: {\n      execution_id: executionId,\n      workflow_version: workflowVersion,\n      processing_time_ms,\n      correlation_id: correlationId,\n      trace_id: normalized.trace_id || 'not_available'\n    },\n    audit_timestamp: now.toISOString(),\n    audit_summary: 'Workflow production ready; audit trail prepared for persistence, SIEM sync, ticketing, cache and manual approval governance.',\n    human_approval: {\n      required: true,\n      required_for_actions: specialist?.critical_actions_need_approval ?? [],\n      approval_status: 'pending_human_review'\n    },\n    correlation,\n    security_notes: {\n      external_calls_allowed: controls.external_calls_allowed === true,\n      remediation_allowed: controls.remediation_allowed === true,\n      credentials_allowed: controls.credentials_allowed === true,\n      production_allowed: controls.production_allowed === true,\n      human_approval_required: true,\n      automated_action_executed: false\n    },\n    validation,\n    rejection,\n    classification,\n    specialist_analysis: specialist,\n    integration_targets: {\n      siem: process.env.SIEM_BASE_URL ? 'configured_by_env' : 'needs_env',\n      ticketing: process.env.TICKETING_BASE_URL ? 'configured_by_env' : 'needs_env',\n      cmdb: process.env.CMDB_BASE_URL ? 'configured_by_env' : 'needs_env',\n      postgres: 'configured_by_credential',\n      redis: 'configured_by_credential'\n    }\n  };\n\n  return {\n    json: {\n      case_id: output.case_id,\n      trace_id: output.trace_id,\n      output_ready_for_human_review: true,\n      soc_octopus_output: output\n    }\n  };\n});"
+      },
+      "id": "prod-consolidador-final",
+      "name": "09 - Consolidador Final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Consolida rejeicao, validacao, classificacao, analise especialista e controles de seguranca em uma saida final revisavel."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.SIEM_BASE_URL}}/api/v1/soc-octopus/events",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParametersJson": "={{JSON.stringify($json.soc_octopus_output)}}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "SIEM_READONLY",
+          "id": "SIEM_READONLY"
+        }
+      },
+      "id": "prod-siem-sync",
+      "name": "10 - SIEM Sync Production",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2520,
+        -240
+      ],
+      "notesInFlow": true,
+      "notes": "Sincroniza o caso final com SIEM via URL e credencial configurados por ambiente.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$vars.TICKETING_BASE_URL}}/api/v1/incidents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParametersJson": "={{JSON.stringify($json.soc_octopus_output)}}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "TICKETING_RW",
+          "id": "TICKETING_RW"
+        }
+      },
+      "id": "prod-ticketing-sync",
+      "name": "11 - Ticketing Sync Production",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2520,
+        -80
+      ],
+      "notesInFlow": true,
+      "notes": "Cria ou atualiza ticket/incidente em sistema de tickets configurado por ambiente.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO soc_audit_log (\n  event_type,\n  actor_type,\n  actor_name,\n  action,\n  details\n) VALUES (\n  $1, $2, $3, $4, $5::jsonb\n)\nRETURNING audit_uuid;",
+        "options": {
+          "queryReplacement": "={{ ['workflow_execution', 'n8n_workflow', $json.soc_octopus_output?.workflow_name || 'SOC-Octopus-Agent', $json.soc_octopus_output?.status || $json.soc_octopus_output?.execution_status || 'analysis_completed', JSON.stringify($json.soc_octopus_output || $json)] }}"
+        }
+      },
+      "credentials": {
+        "postgres": {
+          "name": "SOC_OCTOPUS_POSTGRES",
+          "id": "SOC_OCTOPUS_POSTGRES"
+        }
+      },
+      "id": "prod-postgres-audit",
+      "name": "12 - Persistir Auditoria PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        2520,
+        80
+      ],
+      "notesInFlow": true,
+      "notes": "Persiste trilha de auditoria e metadados de execucao no banco configurado por credencial.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{$json.soc_octopus_output.correlation_id}}",
+        "value": "={{ $json.soc_octopus_output }}"
+      },
+      "credentials": {
+        "redis": {
+          "name": "SOC_OCTOPUS_REDIS",
+          "id": "SOC_OCTOPUS_REDIS"
+        }
+      },
+      "id": "prod-redis-cache",
+      "name": "13 - Cache Correlation Redis",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2520,
+        240
+      ],
+      "notesInFlow": true,
+      "notes": "Armazena correla??o e output em cache para deduplicacao e rastreabilidade.",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json.soc_octopus_output}}"
+      },
+      "id": "prod-respond-webhook",
+      "name": "20 - Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        3460,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Responde ao chamador com a saida consolidada de producao."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const original = $('09 - Consolidador Final').first()?.json?.soc_octopus_output ?? item.json.soc_octopus_output ?? null;\n  const error = item.json.error ?? item.json.message ?? null;\n  return {\n    json: {\n      ...item.json,\n      soc_octopus_output: original,\n      integration_audit: {\n        integration: 'postgresql',\n        branch: 'audit_failure',\n        status: error ? 'failed' : 'completed',\n        error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null,\n        retryable: Boolean(error),\n        observed_at: new Date().toISOString()\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-audit-postgres",
+      "name": "12.1 - Auditoria Falha PostgreSQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2520,
+        80
+      ],
+      "notesInFlow": true,
+      "notes": "Normaliza a trilha de auditoria de falha da persistencia em PostgreSQL."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const original = $('09 - Consolidador Final').first()?.json?.soc_octopus_output ?? item.json.soc_octopus_output ?? null;\n  const error = item.json.error ?? item.json.message ?? null;\n  return {\n    json: {\n      ...item.json,\n      soc_octopus_output: original,\n      integration_audit: {\n        integration: 'redis',\n        branch: 'audit_failure',\n        status: error ? 'failed' : 'completed',\n        error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null,\n        retryable: Boolean(error),\n        observed_at: new Date().toISOString()\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-audit-redis",
+      "name": "13.1 - Auditoria Falha Redis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2520,
+        240
+      ],
+      "notesInFlow": true,
+      "notes": "Normaliza a trilha de auditoria de falha do cache de correlacao em Redis."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const original = $('09 - Consolidador Final').first()?.json?.soc_octopus_output ?? item.json.soc_octopus_output ?? null;\n  const error = item.json.error ?? item.json.message ?? null;\n  return {\n    json: {\n      ...item.json,\n      soc_octopus_output: original,\n      integration_audit: {\n        integration: 'siem',\n        branch: 'audit_failure',\n        status: error ? 'failed' : 'completed',\n        error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null,\n        retryable: Boolean(error),\n        observed_at: new Date().toISOString()\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-audit-siem",
+      "name": "10.1 - Auditoria Falha SIEM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2520,
+        -240
+      ],
+      "notesInFlow": true,
+      "notes": "Normaliza a trilha de auditoria de falha da integracao com SIEM."
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map((item) => {\n  const original = $('09 - Consolidador Final').first()?.json?.soc_octopus_output ?? item.json.soc_octopus_output ?? null;\n  const error = item.json.error ?? item.json.message ?? null;\n  return {\n    json: {\n      ...item.json,\n      soc_octopus_output: original,\n      integration_audit: {\n        integration: 'ticketing',\n        branch: 'audit_failure',\n        status: error ? 'failed' : 'completed',\n        error: error ? (typeof error === 'string' ? error : JSON.stringify(error)) : null,\n        retryable: Boolean(error),\n        observed_at: new Date().toISOString()\n      }\n    }\n  };\n});"
+      },
+      "id": "prod-audit-ticketing",
+      "name": "11.1 - Auditoria Falha Ticketing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2520,
+        -80
+      ],
+      "notesInFlow": true,
+      "notes": "Normaliza a trilha de auditoria de falha do ticketing."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "position",
+        "options": {}
+      },
+      "id": "prod-merge-persistence",
+      "name": "17 - Merge Persistencia",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2820,
+        80
+      ],
+      "notesInFlow": true,
+      "notes": "Consolida as trilhas auditadas de PostgreSQL e Redis."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "position",
+        "options": {}
+      },
+      "id": "prod-merge-integrations",
+      "name": "18 - Merge Integracoes",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        2820,
+        -160
+      ],
+      "notesInFlow": true,
+      "notes": "Consolida as trilhas auditadas de SIEM e Ticketing."
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "position",
+        "options": {}
+      },
+      "id": "prod-merge-final",
+      "name": "19 - Merge Final",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        3140,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Consolida os blocos de persistencia e integracoes antes da resposta final."
+    }
+  ],
+  "connections": {
+    "01 - Webhook Ingress Production": {
+      "main": [
+        [
+          {
+            "node": "02 - Receber Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "00 - Manual Trigger Replay": {
+      "main": [
+        [
+          {
+            "node": "02 - Receber Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 - Receber Payload": {
+      "main": [
+        [
+          {
+            "node": "03 - Normalizar Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 - Normalizar Payload": {
+      "main": [
+        [
+          {
+            "node": "04 - Validar Campos Obrigatorios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 - Validar Campos Obrigatorios": {
+      "main": [
+        [
+          {
+            "node": "05 - Entrada Valida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 - Entrada Valida?": {
+      "main": [
+        [
+          {
+            "node": "06 - Classificar Entrada",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "05.1 - Rejeicao Controlada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05.1 - Rejeicao Controlada": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 - Classificar Entrada": {
+      "main": [
+        [
+          {
+            "node": "07 - Switch Roteamento Causa Raiz",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 - Switch Roteamento Causa Raiz": {
+      "main": [
+        [
+          {
+            "node": "08 - Especialista Identidade",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08.1 - Especialista Endpoint",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08.2 - Especialista Network",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08.3 - Especialista Infrastructure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08.4 - Especialista Automation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "08.5 - Especialista Unknown",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 - Especialista Identidade": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08.1 - Especialista Endpoint": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08.2 - Especialista Network": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08.3 - Especialista Infrastructure": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08.4 - Especialista Automation": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08.5 - Especialista Unknown": {
+      "main": [
+        [
+          {
+            "node": "09 - Consolidador Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 - Consolidador Final": {
+      "main": [
+        [
+          {
+            "node": "12 - Persistir Auditoria PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "13 - Cache Correlation Redis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "10 - SIEM Sync Production",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "11 - Ticketing Sync Production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 - Persistir Auditoria PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "12.1 - Auditoria Falha PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "12.1 - Auditoria Falha PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13 - Cache Correlation Redis": {
+      "main": [
+        [
+          {
+            "node": "13.1 - Auditoria Falha Redis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "13.1 - Auditoria Falha Redis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 - SIEM Sync Production": {
+      "main": [
+        [
+          {
+            "node": "10.1 - Auditoria Falha SIEM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "10.1 - Auditoria Falha SIEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 - Ticketing Sync Production": {
+      "main": [
+        [
+          {
+            "node": "11.1 - Auditoria Falha Ticketing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "11.1 - Auditoria Falha Ticketing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12.1 - Auditoria Falha PostgreSQL": {
+      "main": [
+        [
+          {
+            "node": "17 - Merge Persistencia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "13.1 - Auditoria Falha Redis": {
+      "main": [
+        [
+          {
+            "node": "17 - Merge Persistencia",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "10.1 - Auditoria Falha SIEM": {
+      "main": [
+        [
+          {
+            "node": "18 - Merge Integracoes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11.1 - Auditoria Falha Ticketing": {
+      "main": [
+        [
+          {
+            "node": "18 - Merge Integracoes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "17 - Merge Persistencia": {
+      "main": [
+        [
+          {
+            "node": "19 - Merge Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "18 - Merge Integracoes": {
+      "main": [
+        [
+          {
+            "node": "19 - Merge Final",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "19 - Merge Final": {
+      "main": [
+        [
+          {
+            "node": "20 - Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "staticData": null,
+  "meta": {
+    "project": "SOC-Octopus-Agent",
+    "phase": "production-ready",
+    "real_ready": true,
+    "production_ready": true,
+    "uses_synthetic_payload": false,
+    "contains_credentials": false,
+    "contains_external_integrations": true,
+    "contains_production_data": false,
+    "human_approval_required_for_critical_actions": true,
+    "validation_profile": "prod-template"
+  },
+  "tags": []
+}

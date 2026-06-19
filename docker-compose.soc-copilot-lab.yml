@@ -1,0 +1,67 @@
+name: soc-copilot-lab
+
+services:
+  postgres-lab:
+    image: postgres:16-alpine
+    container_name: ${SOC_COPILOT_POSTGRES_CONTAINER:-soc-copilot-postgres-lab}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${SOC_COPILOT_POSTGRES_DB:-soc_copilot_lab}
+      POSTGRES_USER: ${SOC_COPILOT_POSTGRES_USER:-soc_copilot_user}
+      POSTGRES_PASSWORD: ${SOC_COPILOT_POSTGRES_PASSWORD:?defina SOC_COPILOT_POSTGRES_PASSWORD no .env.soc-copilot-lab}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      TZ: ${SOC_COPILOT_TZ:-America/Sao_Paulo}
+    ports:
+      - "${SOC_COPILOT_POSTGRES_BIND_ADDRESS:-127.0.0.1}:${SOC_COPILOT_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - soc_copilot_postgres_lab_data:/var/lib/postgresql/data
+      - ./05-sql/soc-investigation-copilot-schema.sql:/docker-entrypoint-initdb.d/05-soc-investigation-copilot-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - soc-copilot-lab
+    labels:
+      com.soc-octopus.scope: "lab"
+      com.soc-octopus.component: "soc-investigation-copilot-postgres"
+
+  redis-lab:
+    image: redis:7-alpine
+    container_name: ${SOC_COPILOT_REDIS_CONTAINER:-soc-copilot-redis-lab}
+    restart: unless-stopped
+    environment:
+      SOC_COPILOT_REDIS_PASSWORD: ${SOC_COPILOT_REDIS_PASSWORD:?defina SOC_COPILOT_REDIS_PASSWORD no .env.soc-copilot-lab}
+      TZ: ${SOC_COPILOT_TZ:-America/Sao_Paulo}
+    command:
+      - sh
+      - -c
+      - redis-server --appendonly yes --requirepass "$${SOC_COPILOT_REDIS_PASSWORD}"
+    ports:
+      - "${SOC_COPILOT_REDIS_BIND_ADDRESS:-127.0.0.1}:${SOC_COPILOT_REDIS_PORT:-6380}:6379"
+    volumes:
+      - soc_copilot_redis_lab_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${SOC_COPILOT_REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - soc-copilot-lab
+    labels:
+      com.soc-octopus.scope: "lab"
+      com.soc-octopus.component: "soc-investigation-copilot-redis"
+
+networks:
+  soc-copilot-lab:
+    name: soc-copilot-lab-network
+    driver: bridge
+
+volumes:
+  soc_copilot_postgres_lab_data:
+    name: soc_copilot_postgres_lab_data
+  soc_copilot_redis_lab_data:
+    name: soc_copilot_redis_lab_data

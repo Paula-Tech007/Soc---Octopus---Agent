@@ -1,0 +1,43 @@
+{
+  "case_id": "CASE-MOCK-0001",
+  "trace_id": "TRACE-MOCK-20260616-0001",
+  "status": "analysis_completed_mock",
+  "executive_summary": "Analise mockada indica possivel tentativa de acesso indevido a conta privilegiada ficticia.",
+  "probable_root_cause": "identity",
+  "risk_level": "high",
+  "evidence_summary": [
+    "Multiplas falhas de autenticacao seguidas de sucesso.",
+    "Conta ficticia possui perfil privilegiado.",
+    "Origem de rede usa endereco reservado para documentacao."
+  ],
+  "specialists_involved": [
+    "cerebro-central",
+    "especialista-identidade",
+    "especialista-alertas-soc",
+    "especialista-solucao-remediacao"
+  ],
+  "recommended_solution": "Validar legitimidade do acesso, revisar logs de autenticacao, confirmar atividade com responsavel ficticio e preparar contencao somente apos aprovacao humana.",
+  "technical_steps": [
+    "Correlacionar eventos de autenticacao do usuario ficticio.",
+    "Verificar origem, horario e padrao de acesso.",
+    "Confirmar se houve alteracao recente de MFA ou credenciais.",
+    "Avaliar necessidade de bloqueio temporario somente com aprovacao humana.",
+    "Registrar conclusao e evidencias no caso mockado."
+  ],
+  "escalation_recommended": "Escalonar para equipe de Identidade se o acesso nao for reconhecido pelo responsavel ficticio.",
+  "security_notes": [
+    "Nao executar bloqueio automatico nesta fase.",
+    "Nao solicitar ou registrar credenciais.",
+    "Usar somente dados ficticios durante testes."
+  ],
+  "confidence_level": "medium",
+  "possible_false_positive": true,
+  "human_approval_required": true,
+  "audit": {
+    "mock_payload": true,
+    "contains_real_customer_data": false,
+    "contains_credentials": false,
+    "created_for_phase": "fase-2",
+    "created_at": "2026-06-16T12:40:00Z"
+  }
+}

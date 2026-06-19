@@ -1,0 +1,56 @@
+{
+"tenant_id": "atos-lab",
+"source": "wazuh",
+"alert_id": "WAZUH-SSH-000001",
+"timestamp": "2026-06-18T14:32:15Z",
+"severity": "medium",
+"correlation_id": null,
+
+"agent": {
+"id": "001",
+"name": "srv-linux-01",
+"ip": "10.10.20.15"
+},
+
+"rule": {
+"id": "5710",
+"level": 10,
+"description": "Multiple SSH authentication failures detected",
+"groups": [
+"authentication_failed",
+"sshd",
+"bruteforce"
+]
+},
+
+"event": {
+"event_type": "ssh_bruteforce",
+"username": "admin",
+"src_ip": "203.0.113.55",
+"dst_ip": "10.10.20.15",
+"protocol": "ssh",
+"port": 22,
+"failed_attempts": 37
+},
+
+"threat_context": {
+"known_malicious": false,
+"ioc_present": true,
+"ioc_type": "ip",
+"ioc_value": "203.0.113.55"
+},
+
+"mitre": {
+"tactic": "Credential Access",
+"technique": "Brute Force",
+"technique_id": "T1110"
+},
+
+"investigation": {
+"status": "new",
+"approval_required": false
+},
+
+"raw_log": "Failed password for admin from 203.0.113.55 port 51234 ssh2",
+"created_at": "2026-06-18T14:32:15Z"
+}

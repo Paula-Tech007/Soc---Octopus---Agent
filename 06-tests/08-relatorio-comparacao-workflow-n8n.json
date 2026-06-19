@@ -1,0 +1,14 @@
+{
+  "project": "SOC-Octopus-Agent",
+  "tool": "06-tests/07-comparador-workflow-n8n.py",
+  "created_at": "2026-06-16T19:11:03.696433+00:00",
+  "status": "aprovado",
+  "arquivo_base": "02-workflows-n8n/soc-octopus-prototipo-mock.json",
+  "arquivo_comparado": "02-workflows-n8n/soc-octopus-prototipo-mock.json",
+  "total_divergencias": 0,
+  "divergencias_bloqueantes": 0,
+  "divergencias_requerem_revisao": 0,
+  "divergencias_aceitaveis_com_registro": 0,
+  "decisao_recomendada": "Workflow comparado preserva a estrutura aprovada no escopo estatico.",
+  "divergencias": []
+}

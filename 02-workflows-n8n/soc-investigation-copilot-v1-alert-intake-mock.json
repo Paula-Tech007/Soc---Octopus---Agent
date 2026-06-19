@@ -1,0 +1,368 @@
+{
+  "name": "SOC Investigation Copilot - V1 Alert Intake MOCK",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "01-manual-trigger",
+      "name": "01 - Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Inicio manual para validacao mockada. Nao usa webhook real, credenciais, Redis ou PostgreSQL."
+    },
+    {
+      "parameters": {
+        "jsCode": "const incoming = $input.first()?.json ?? {};\n\nconst payload = {\n  tenant_id: 'atos-lab',\n  source: 'wazuh',\n  alert_id: 'WAZUH-SSH-000001',\n  timestamp: '2026-06-18T14:32:15Z',\n  severity: 'medium',\n  correlation_id: null,\n  agent: {\n    id: '001',\n    name: 'srv-linux-01',\n    ip: '10.10.20.15'\n  },\n  rule: {\n    id: '5710',\n    level: 10,\n    description: 'Multiple SSH authentication failures detected',\n    groups: [\n      'authentication_failed',\n      'sshd',\n      'bruteforce'\n    ]\n  },\n  event: {\n    event_type: 'ssh_bruteforce',\n    username: 'admin',\n    src_ip: '203.0.113.55',\n    dst_ip: '10.10.20.15',\n    protocol: 'ssh',\n    port: 22,\n    failed_attempts: 37\n  },\n  threat_context: {\n    known_malicious: false,\n    ioc_present: true,\n    ioc_type: 'ip',\n    ioc_value: '203.0.113.55'\n  },\n  mitre: {\n    tactic: 'Credential Access',\n    technique: 'Brute Force',\n    technique_id: 'T1110'\n  },\n  investigation: {\n    status: 'new',\n    approval_required: false\n  },\n  raw_log: 'Failed password for admin from 203.0.113.55 port 51234 ssh2',\n  created_at: '2026-06-18T14:32:15Z'\n};\n\nif (incoming.mock_alert_id) {\n  payload.alert_id = incoming.mock_alert_id;\n}\n\nreturn [{ json: payload }];"
+      },
+      "id": "02-set-mock-alert",
+      "name": "02 - Set Mock Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Define payload Wazuh sintetico para teste. Opcionalmente aceita mock_alert_id vindo de pin data do Manual Trigger para testar duplicidade."
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json;\n\nconst requiredFields = ['tenant_id', 'source', 'alert_id', 'timestamp'];\nconst missing = requiredFields.filter((field) => body[field] === undefined || body[field] === null || body[field] === '');\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      valid: false,\n      error_type: 'validation_error',\n      message: 'Missing required fields',\n      missing_fields: missing,\n      received_payload: body\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    valid: true,\n    received_payload: body\n  }\n}];"
+      },
+      "id": "03-validate-payload",
+      "name": "03 - Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Valida campos minimos obrigatorios sem consultar sistemas externos."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.valid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "04-is-payload-valid",
+      "name": "04 - Is Payload Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        780,
+        0
+      ],
+      "notesInFlow": true,
+      "notes": "Encaminha payload valido para normalizacao e invalido para resposta 400."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 400,
+        "responseBody": "={{ { status: 'rejected', accepted: false, duplicate: false, reason: $json.message, missing_fields: $json.missing_fields } }}"
+      },
+      "id": "07-respond-invalid-payload",
+      "name": "07 - Respond Invalid Payload",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        220
+      ],
+      "notesInFlow": true,
+      "notes": "Resposta mockada para payload invalido. Mantem a semantica de API, mas o workflow permanece manual e inativo."
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json.received_payload;\nconst now = new Date();\nconst timestamp = now.toISOString();\nconst random = Math.random().toString(36).slice(2, 10);\nconst safeAlertId = String(payload.alert_id).replace(/[^a-zA-Z0-9_-]/g, '-');\n\nconst correlationId = payload.correlation_id || `corr-${now.getTime()}-${random}`;\nconst investigationId = `inv-${now.getTime()}-${safeAlertId}`;\nconst executionId = `exec-${now.getTime()}-${random}`;\n\nconst normalized = {\n  tenant_id: payload.tenant_id || 'default',\n  source: payload.source,\n  alert_id: payload.alert_id,\n  timestamp: payload.timestamp,\n  correlation_id: correlationId,\n  investigation_id: investigationId,\n  execution_id: executionId,\n  severity_original: payload.severity || payload.rule?.level || 'unknown',\n  rule_id: payload.rule?.id || null,\n  rule_name: payload.rule?.description || null,\n  src_ip: payload.event?.src_ip || null,\n  dst_ip: payload.event?.dst_ip || payload.agent?.ip || null,\n  hostname: payload.agent?.name || payload.event?.hostname || null,\n  username: payload.event?.username || null,\n  raw_payload: payload,\n  redis_key: `soc:investigation:${payload.tenant_id || 'default'}:${payload.source}:${payload.alert_id}`,\n  received_at: timestamp,\n  workflow_mode: 'mock'\n};\n\nreturn [{ json: normalized }];"
+      },
+      "id": "05-normalize-alert",
+      "name": "05 - Normalize Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -80
+      ],
+      "notesInFlow": true,
+      "notes": "Normaliza alerta e gera correlation_id, investigation_id, execution_id e redis_key de forma local."
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const current = item.json;\n  const duplicate = current.alert_id === 'WAZUH-SSH-000001-DUPLICATE';\n\n  return {\n    json: {\n      ...current,\n      duplicate\n    }\n  };\n});"
+      },
+      "id": "06-mock-redis-check-duplicate",
+      "name": "06 - Mock Redis Check Duplicate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        -80
+      ],
+      "notesInFlow": true,
+      "notes": "Simula consulta Redis. Retorna duplicate=true apenas para WAZUH-SSH-000001-DUPLICATE."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.duplicate }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "08-is-duplicate",
+      "name": "08 - Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        -80
+      ],
+      "notesInFlow": true,
+      "notes": "Se duplicado, encerra em resposta controlada. Se nao duplicado, segue para mocks de persistencia."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 200,
+        "responseBody": "={{ { status: 'duplicate', accepted: false, duplicate: true } }}"
+      },
+      "id": "09-respond-duplicate",
+      "name": "09 - Respond Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1820,
+        120
+      ],
+      "notesInFlow": true,
+      "notes": "Resposta mockada para alerta duplicado."
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const current = item.json;\n\n  return {\n    json: {\n      ...current,\n      redis_mock: {\n        stored: true,\n        ttl: 3600\n      }\n    }\n  };\n});"
+      },
+      "id": "10-mock-redis-store-dedup-key",
+      "name": "10 - Mock Redis Store Dedup Key",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        -180
+      ],
+      "notesInFlow": true,
+      "notes": "Simula gravacao da chave de deduplicacao no Redis com TTL de 3600 segundos."
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => {\n  const current = item.json;\n\n  return {\n    json: {\n      ...current,\n      postgres_mock: {\n        inserted: true,\n        table: 'soc_alerts',\n        alert_uuid: 'mock-alert-uuid'\n      }\n    }\n  };\n});"
+      },
+      "id": "11-mock-postgresql-insert-alert",
+      "name": "11 - Mock PostgreSQL Insert Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        -180
+      ],
+      "notesInFlow": true,
+      "notes": "Simula insert na tabela soc_alerts sem executar query e sem credencial PostgreSQL."
+    },
+    {
+      "parameters": {
+        "jsCode": "const current = $input.first().json;\n\nreturn [{\n  json: {\n    status: 'accepted',\n    accepted: true,\n    duplicate: false,\n    tenant_id: current.tenant_id,\n    source: current.source,\n    alert_id: current.alert_id,\n    correlation_id: current.correlation_id,\n    investigation_id: current.investigation_id,\n    redis_key: current.redis_key,\n    next_stage: 'ai_analysis_pending',\n    production_status: 'mock_intake_completed'\n  }\n}];"
+      },
+      "id": "12-build-response",
+      "name": "12 - Build Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2340,
+        -180
+      ],
+      "notesInFlow": true,
+      "notes": "Monta resposta final aceita esperada pelo teste funcional mockado."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 202,
+        "responseBody": "={{ $json }}"
+      },
+      "id": "13-respond-accepted",
+      "name": "13 - Respond Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2600,
+        -180
+      ],
+      "notesInFlow": true,
+      "notes": "Resposta final para alerta aceito em modo mock."
+    }
+  ],
+  "connections": {
+    "01 - Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "02 - Set Mock Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 - Set Mock Alert": {
+      "main": [
+        [
+          {
+            "node": "03 - Validate Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 - Validate Payload": {
+      "main": [
+        [
+          {
+            "node": "04 - Is Payload Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 - Is Payload Valid?": {
+      "main": [
+        [
+          {
+            "node": "05 - Normalize Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "07 - Respond Invalid Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 - Normalize Alert": {
+      "main": [
+        [
+          {
+            "node": "06 - Mock Redis Check Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 - Mock Redis Check Duplicate": {
+      "main": [
+        [
+          {
+            "node": "08 - Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 - Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "09 - Respond Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "10 - Mock Redis Store Dedup Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 - Mock Redis Store Dedup Key": {
+      "main": [
+        [
+          {
+            "node": "11 - Mock PostgreSQL Insert Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 - Mock PostgreSQL Insert Alert": {
+      "main": [
+        [
+          {
+            "node": "12 - Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 - Build Response": {
+      "main": [
+        [
+          {
+            "node": "13 - Respond Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "pinData": {},
+  "staticData": null,
+  "versionId": "soc-investigation-copilot-v1-alert-intake-mock",
+  "meta": {
+    "project": "SOC Investigation Copilot",
+    "phase": "Workflow 01 - Alert Intake",
+    "mode": "mock",
+    "status": "mock-ready",
+    "production_readiness": "not-approved",
+    "contains_credentials": false,
+    "contains_real_redis_node": false,
+    "contains_real_postgres_node": false,
+    "contains_external_integrations": false,
+    "uses_synthetic_payload": true,
+    "validation_profile": "mock-executable"
+  },
+  "tags": []
+}
